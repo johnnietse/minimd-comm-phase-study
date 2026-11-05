@@ -1,0 +1,57 @@
+================================================================================
+MINIMD PERFORMANCE OPTIMIZATION RECOMMENDATIONS
+================================================================================
+
+SYSTEM INFORMATION:
+--------------------------------------------------
+Detected MPI Ranks: 16
+Total Cores Available: 32
+
+Network Interfaces:
+  - eno1: 1000 Mb/s
+  - eno2: 1000 Mb/s
+
+PERFORMANCE ANALYSIS:
+--------------------------------------------------
+
+================================================================================
+OPTIMIZATION RECOMMENDATIONS
+================================================================================
+
+1. BALANCED WORKLOAD OPTIMIZATIONS:
+   a. Use hybrid MPI+OpenMP parallelization:
+      mpirun -np 4 --bind-to core ./miniMD_openmpi -i in.lj.miniMD
+      export OMP_NUM_THREADS=4
+   b. Tune neighbor list parameters in input file:
+      neighbor 2.8 bin  # Adjust cutoff and bin size
+   c. Implement overlapping computation and communication
+
+2. CPU AND POWER MANAGEMENT:
+   a. Set CPU governor to 'performance' during runs:
+      cpupower frequency-set -g performance
+   b. Monitor power efficiency using RAPL metrics
+   c. Consider frequency scaling for energy-efficient runs
+
+3. ALGORITHMIC OPTIMIZATIONS:
+   a. Increase problem size per rank (atoms/rank):
+      Reduces communication-to-computation ratio
+   b. Adjust neighbor list frequency:
+      Higher frequency = more accurate but more communication
+   c. Consider domain decomposition alternatives
+
+4. MONITORING AND VALIDATION:
+   a. Run with different MPI implementations:
+      OpenMPI, Intel MPI, MPICH for comparison
+   b. Validate with hardware performance counters:
+      perf stat -e cache-misses,cycles,instructions
+   c. Compare scaling across different node counts
+
+================================================================================
+IMMEDIATE ACTION ITEMS
+================================================================================
+
+1. Run MPI profiling: mpiP or Intel VTune Amplifier
+2. Verify network hardware: ethtool eno1
+3. Test process binding: --bind-to core --map-by core
+4. Experiment with hybrid MPI+OpenMP for medium ranks
+5. Compare results with: scaling_analysis_20260119_010826.json

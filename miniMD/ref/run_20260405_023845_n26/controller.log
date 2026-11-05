@@ -1,0 +1,12 @@
+[startup] Communication Phase Monitor & Control starting...
+[startup] RAPL found at /sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj
+[startup] cpupower available for DVFS
+[startup] logging to communication_phase_monitor.csv
+[startup] waiting for MiniMD to launch...
+[start] detected 1 MPI ranks: [3516194]
+[run] entering monitoring loop...
+Traceback (most recent call last):
+  File "/global/home/hpc6081/miniMD/ref/./monitor.py", line 418, in <module>
+    watts, energy_joules, prev_energy = read_rapl(prev_energy)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: not enough values to unpack (expected 3, got 2)

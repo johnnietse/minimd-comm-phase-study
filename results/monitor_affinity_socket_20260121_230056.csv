@@ -1,0 +1,2 @@
+timestamp,profile,phase,cpu_usage,memory_usage,context_switches,network_usage
+1769054457.220017,affinity_socket,COMMUNICATION,0.10,5.88,15897635419,1176117.75

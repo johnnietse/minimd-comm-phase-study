@@ -1,0 +1,1 @@
+timestamp,phase,confidence,power_W,dram_power_W,cpu_user_pct,cpu_system_pct,cpu_idle_pct,cpu_active_pct,cpu_iowait_pct,voluntary_ctx_switches_per_sec,active_mpi_ranks,expected_mpi_ranks,net_recv_mbps,net_sent_mbps,sync_variance_pct,power_z_score,idle_z_score,ctx_z_score,sync_z_score,comm_score_norm,comp_score_norm,pkg_energy_J,dram_energy_J,reasons

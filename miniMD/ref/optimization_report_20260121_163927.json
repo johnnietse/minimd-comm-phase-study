@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-01-21T16:39:29.126931",
+  "optimization_profile": "hybrid_4threads",
+  "profile_description": "Hybrid MPI+OpenMP with 4 threads per rank",
+  "ranks": 8,
+  "command": "mpirun -np 8 --oversubscribe --bind-to socket --map-by socket:PE=4 ./miniMD_openmpi -i in.lj.miniMD",
+  "environment_variables": {
+    "OMP_NUM_THREADS": "4",
+    "OMP_PROC_BIND": "true",
+    "OMP_PLACES": "cores",
+    "OMPI_MCA_btl_tcp_if_include": "eno1,eno2"
+  },
+  "performance": {
+    "total_time": 0.0008528232574462891,
+    "communication_time": 0,
+    "communication_percentage": 0.0,
+    "expected_communication": 75.5,
+    "difference": -75.5,
+    "phase_distribution": {},
+    "phase_transitions": 0
+  },
+  "recommendations": []
+}

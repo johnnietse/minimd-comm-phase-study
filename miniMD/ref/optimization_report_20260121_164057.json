@@ -1,0 +1,44 @@
+{
+  "timestamp": "2026-01-21T16:41:57.945290",
+  "optimization_profile": "network_optimized",
+  "profile_description": "Network-optimized for Ethernet (eno1, eno2)",
+  "ranks": 33,
+  "command": "mpirun -np 32 --oversubscribe --mca btl tcp,self --mca btl_tcp_if_include eno1,eno2 --mca btl_tcp_port_min_v4 60000 --mca btl_tcp_port_max_v4 61000 ./miniMD_openmpi -i in.lj.miniMD",
+  "environment_variables": {
+    "OMPI_MCA_btl": "tcp,self",
+    "OMPI_MCA_btl_tcp_if_include": "eno1,eno2",
+    "OMPI_MCA_btl_tcp_eager_limit": "524288"
+  },
+  "performance": {
+    "total_time": 58.82630705833435,
+    "communication_time": 55.268447160720825,
+    "communication_percentage": 93.95192376416657,
+    "expected_communication": 96.9,
+    "difference": -2.9480762358334403,
+    "phase_distribution": {
+      "COMMUNICATION": {
+        "time": 55.268447160720825,
+        "samples": 2,
+        "transitions": 2
+      },
+      "NETWORK_COMM": {
+        "time": 2.5178117752075195,
+        "samples": 1,
+        "transitions": 1
+      },
+      "IDLE": {
+        "time": 0.6420390605926514,
+        "samples": 1,
+        "transitions": 0
+      }
+    },
+    "phase_transitions": 3
+  },
+  "recommendations": [
+    {
+      "type": "network",
+      "message": "Extremely communication-bound. Network optimization crucial.",
+      "suggested_profile": "network_optimized"
+    }
+  ]
+}

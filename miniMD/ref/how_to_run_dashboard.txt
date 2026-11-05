@@ -1,0 +1,32 @@
+terminal 1
+export PHASE_HINT_PATH=/dev/shm/minimd_phase_hints_test.bin
+
+taskset -c 30 python3 -u ./monitor.py \
+  --hint-file "$PHASE_HINT_PATH" \
+  --freq-low 1200000 \
+  --freq-mid 1600000 \
+  --poll-ms 2 \
+  --low-after-ms 2 \
+  --mid-after-ms 5
+
+
+
+
+terminal 2
+export PHASE_HINT_PATH=/dev/shm/minimd_phase_hints_test.bin
+
+OMP_NUM_THREADS=1 \
+OMP_PROC_BIND=true \
+OMP_PLACES=cores \
+PHASE_HINT_PATH="$PHASE_HINT_PATH" \
+taskset -c 4-29 \
+mpirun -np 26 \
+  --bind-to core \
+  --map-by core \
+  --report-bindings \
+  ./miniMD_openmpi -i in.lj.miniMD
+
+
+terminal 3 dashboard
+export PHASE_HINT_PATH=/dev/shm/minimd_phase_hints_test.bin
+python3 dvfs_dashboard.py --cores 32 --refresh 0.5 --hint-file "$PHASE_HINT_PATH"

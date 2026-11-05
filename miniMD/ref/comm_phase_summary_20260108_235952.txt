@@ -1,0 +1,58 @@
+================================================================================
+MiniMD Communication Phase Analysis - Version 9.0 (ADAPTIVE)
+================================================================================
+
+GROUND TRUTH FROM miniMD OUTPUT:
+----------------------------------------
+t_total             : Parse from miniMD output
+t_comm              : Parse from miniMD output
+t_force             : Parse from miniMD output
+t_neigh             : Parse from miniMD output
+t_other             : Parse from miniMD output
+comm_percentage     : Parse from miniMD output
+
+STATISTICAL BASELINES ESTABLISHED:
+----------------------------------------
+Power:      mean=75.9W, std=0.0W
+Idle time:  mean=95.9%, std=0.0%
+Ctx rate:   mean=10490/s, std=0/s
+Sync var:   mean=0.0%, std=0.0%
+Samples for baseline: 1
+
+PHASE DURATION ANALYSIS:
+----------------------------------------
+
+Total monitored time: 0.22s
+Total tracked phase time: 0.00s
+
+================================================================================
+OPTIMIZATION RECOMMENDATIONS (BASED ON MEASUREMENTS):
+================================================================================
+
+MPI SIZE ANALYSIS (3 ranks):
+----------------------------------------
+1. SMALL MPI SIZE (≤4 ranks):
+   - Computation dominates (check compute percentage)
+   - Focus on compute optimization
+   - Consider reducing communication frequency
+
+2. WORKLOAD CHARACTERIZATION (0.0% communication):
+----------------------------------------
+   - COMPUTE-DOMINATED WORKLOAD
+   - Focus on: Vectorization, threading, algorithm optimization
+   - Secondary: Reduce MPI overhead where possible
+
+3. SPECIFIC OPTIMIZATIONS BASED ON METRICS:
+----------------------------------------
+   - High context switches detected
+   - Consider: MPI_Init_thread with MPI_THREAD_MULTIPLE
+   - Or: Check for unnecessary MPI_Wait calls
+   - Excellent synchronization detected
+   - Good load balancing
+
+4. GENERAL RECOMMENDATIONS:
+----------------------------------------
+   - Reduce message sizes (ghost cell optimization)
+   - Use MPI_Iallreduce for global operations
+   - Consider communication-computation overlap
+   - Profile with hardware counters for deeper insights

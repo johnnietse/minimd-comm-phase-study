@@ -1,0 +1,8 @@
+{
+  "energy_reduction_pkg": 0,
+  "energy_reduction_ram": 0,
+  "cache_miss_improvement": -3.4621768432595386,
+  "performance_impact": -21.049553800968557,
+  "energy_target_met": false,
+  "performance_target_met": false
+}

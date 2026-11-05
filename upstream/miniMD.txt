@@ -1,0 +1,3 @@
+url https://github.com/Mantevo/miniMD.git
+commit 2662065eb2b2264a673bda780a23d296f05a2c87
+date 2025-03-04T07:47:04-07:00

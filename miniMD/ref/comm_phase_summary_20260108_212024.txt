@@ -1,0 +1,29 @@
+======================================================================
+MiniMD Communication Phase Analysis - CORRECTED
+======================================================================
+
+GROUND TRUTH FROM miniMD OUTPUT:
+----------------------------------------
+t_total             : 10.36
+t_comm              : 10.12
+t_force             : 0.19
+t_neigh             : 0.03
+t_other             : 0.01
+comm_percentage     : 97.7
+
+PHASE DURATION ANALYSIS:
+----------------------------------------
+UNKNOWN             :    7.80s ( 90.4%) | Samples:   39 | Avg: 0.200s
+
+Total monitored time: 8.63s
+Total tracked phase time: 7.80s
+
+======================================================================
+OPTIMIZATION RECOMMENDATIONS:
+======================================================================
+
+3. GENERAL OPTIMIZATIONS:
+   - Reduce message sizes (ghost cell optimization)
+   - Improve load balancing across ranks
+   - Use appropriate MPI datatypes
+   - Consider communication-computation overlap

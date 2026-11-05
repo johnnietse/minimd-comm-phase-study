@@ -1,0 +1,2 @@
+timestamp,profile,phase,cpu_usage,memory_usage,context_switches,network_usage
+1769054773.5066106,custom_combined,COMMUNICATION,0.10,5.88,15897788893,1176118.98

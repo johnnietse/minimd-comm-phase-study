@@ -1,0 +1,3 @@
+run,nprocs,energy_j,time_s,t_force,t_neigh,t_comm,t_other,performance
+1,16,7299.031,<t_total>,<t_force>,<t_neigh>,<t_comm>,<t_other>,<performance>
+8,16,9339.990,69.661201,29.383212,4.731318,0.806517,34.740153,12042008.939324

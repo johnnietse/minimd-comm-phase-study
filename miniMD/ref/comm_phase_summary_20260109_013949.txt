@@ -1,0 +1,67 @@
+================================================================================
+PERFECT MiniMD Communication Phase Analysis - Version 9.0
+================================================================================
+
+GROUND TRUTH FROM miniMD OUTPUT:
+--------------------------------------------------
+t_total                  : 10.36
+t_comm                   : 10.12
+t_force                  : 0.19
+t_neigh                  : 0.03
+t_other                  : 0.01
+comm_percentage          : 97.7
+
+PHASE DURATION ANALYSIS:
+--------------------------------------------------
+COMMUNICATION            :     0.88s (  9.74%) | Samples:     1 | Avg:  0.876s | Transitions: 1
+IDLE                     :     8.10s ( 90.09%) | Samples:     1 | Avg:  8.098s | Transitions: 0
+
+Total monitored time: 8.99s
+Total tracked phase time: 8.97s
+Untracked time: 0.02s (0.2%)
+
+COMMUNICATION ANALYSIS:
+--------------------------------------------------
+Time in communication: 0.88s (9.74%)
+Expected from miniMD: 97.68%
+Difference: -87.94%
+⚠ Significant deviation from miniMD timing
+
+================================================================================
+PERFORMANCE CHARACTERIZATION:
+================================================================================
+
+
+================================================================================
+OPTIMIZATION RECOMMENDATIONS:
+================================================================================
+
+1. COMMUNICATION OPTIMIZATIONS:
+   - Use non-blocking MPI calls (MPI_Isend/MPI_Irecv)
+   - Implement communication-computation overlap
+   - Reduce message sizes via domain decomposition optimization
+   - Use MPI collective operations efficiently
+   - Consider MPI+OpenMP hybrid parallelism
+
+2. COMPUTE OPTIMIZATIONS:
+   - Vectorize force calculations
+   - Optimize memory access patterns
+   - Consider algorithmic improvements
+   - Profile individual kernels for hotspots
+
+3. SYSTEM OPTIMIZATIONS:
+   - Ensure proper CPU affinity/pinning
+   - Use high-performance network (InfiniBand)
+   - Optimize MPI library configuration
+   - Consider process/thread binding
+
+4. SCALING ANALYSIS:
+   - Run with different MPI ranks (2, 4, 8, 16, 32, 64)
+   - Analyze weak and strong scaling behavior
+   - Identify optimal process count for this problem size
+
+5. DEBUGGING TIPS:
+   - Use MPI profiling tools (mpiP, IPM, TAU)
+   - Check for load imbalance across ranks
+   - Monitor network bandwidth and latency
+   - Profile memory bandwidth usage

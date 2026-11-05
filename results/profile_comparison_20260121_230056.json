@@ -1,0 +1,80 @@
+{
+  "timestamp": "2026-01-21T23:00:57.669263",
+  "ranks": 32,
+  "executable": "./miniMD_openmpi",
+  "input_file": "in.lj.miniMD",
+  "profiles_tested": [
+    "baseline",
+    "tuned",
+    "affinity_core",
+    "affinity_socket",
+    "hybrid_4threads",
+    "hybrid_8threads",
+    "network_optimized",
+    "memory_optimized",
+    "coll_optimized",
+    "custom_combined"
+  ],
+  "results": {
+    "custom_combined": {
+      "execution_time": 0.06055283546447754,
+      "improvement_vs_baseline": 23.56467645970079,
+      "performance": 0,
+      "success": false
+    },
+    "hybrid_8threads": {
+      "execution_time": 0.060730695724487305,
+      "improvement_vs_baseline": 23.34016498283059,
+      "performance": 0,
+      "success": false
+    },
+    "hybrid_4threads": {
+      "execution_time": 0.0607914924621582,
+      "improvement_vs_baseline": 23.26342178363233,
+      "performance": 0,
+      "success": false
+    },
+    "affinity_socket": {
+      "execution_time": 0.06324005126953125,
+      "improvement_vs_baseline": 20.17262705513773,
+      "performance": 0,
+      "success": false
+    },
+    "memory_optimized": {
+      "execution_time": 0.06377077102661133,
+      "improvement_vs_baseline": 19.50270406919528,
+      "performance": 0,
+      "success": false
+    },
+    "tuned": {
+      "execution_time": 0.0638587474822998,
+      "improvement_vs_baseline": 19.391652145649562,
+      "performance": 0,
+      "success": false
+    },
+    "network_optimized": {
+      "execution_time": 0.06541824340820312,
+      "improvement_vs_baseline": 17.423113847783625,
+      "performance": 0,
+      "success": false
+    },
+    "coll_optimized": {
+      "execution_time": 0.06573367118835449,
+      "improvement_vs_baseline": 17.024952073119717,
+      "performance": 0,
+      "success": false
+    },
+    "affinity_core": {
+      "execution_time": 0.07684779167175293,
+      "improvement_vs_baseline": 2.9956933522332267,
+      "performance": 0,
+      "success": false
+    },
+    "baseline": {
+      "execution_time": 0.07922101020812988,
+      "improvement_vs_baseline": 0.0,
+      "performance": 0,
+      "success": false
+    }
+  }
+}

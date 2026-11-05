@@ -1,0 +1,5 @@
+processes,atoms_per_proc,total_time,comm_time,energy_j
+4,8192,NA,NA,NA
+8,8192,NA,NA,NA
+16,8192,NA,NA,NA
+32,8192,NA,NA,NA

@@ -1,0 +1,63 @@
+[startup] Communication Phase Monitor & Control starting...
+[startup] RAPL found at /sys/class/powercap/intel-rapl/intel-rapl:0/energy_uj
+[startup] cpupower available for DVFS
+[startup] logging to communication_phase_monitor.csv
+[startup] waiting for MiniMD to launch...
+[start] detected 3 MPI ranks: [3609052, 3609062, 3609063]
+[run] entering monitoring loop...
+[  0.04s] ~ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=0.00W | Phase=IDLE | Policy=NORMAL
+[transition @   0.08s] IDLE -> COMMUNICATION (duration: 0.04s)
+[  0.08s] ~ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=27.06W | Phase=COMMUNICATION | Policy=NORMAL
+[  0.12s] ~ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=26.55W | Phase=COMMUNICATION | Policy=NORMAL
+[control] Switching policy: NORMAL -> COMM_SAVE
+[  0.17s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=26.33W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  0.22s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=42.51W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  0.27s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=36.99W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  0.32s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=36.85W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  0.36s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=41.50W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  0.40s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=28.35W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  0.44s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=27.51W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  0.48s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=29.51W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  0.54s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=24.78W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  0.59s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=38.28W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  0.62s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=28.90W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  0.66s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=23.59W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  0.72s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=25.52W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  0.77s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=34.21W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  0.81s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=32.56W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  0.86s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=36.15W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  0.90s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=26.29W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  0.95s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=28.88W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  0.99s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=27.26W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  1.04s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=28.15W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  1.07s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=26.52W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  1.14s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=22.81W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  1.18s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=39.43W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  1.22s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=24.31W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  1.26s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=22.85W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  1.32s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=28.04W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  1.36s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=32.55W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  1.40s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=24.20W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  1.44s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=34.35W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  1.55s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=70.43W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  1.59s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=24.96W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  1.64s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=24.96W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  1.68s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=33.89W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  1.72s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=31.18W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  1.78s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=26.29W | Phase=COMMUNICATION | Policy=COMM_SAVE
+[  1.81s] ✓ IPC=0.00 | MPI_wait=40.0% | Sync=0.0% | Power=38.63W | Phase=COMMUNICATION | Policy=COMM_SAVE
+/bin/sh: tasklist: command not found
+[stop] MiniMD finished.
+[complete] Monitoring data saved to communication_phase_monitor.csv
+
+[analysis] Generating phase summary...
+
+Total monitoring time: 1.81s
+
+Phase Distribution:
+  COMMUNICATION  :   3.80s (209.9%)
+  IDLE           :   0.10s (  5.5%)
+
+Communication Phase Statistics:
+  Avg MPI wait:       40.0%
+  Avg power draw:     31.14W

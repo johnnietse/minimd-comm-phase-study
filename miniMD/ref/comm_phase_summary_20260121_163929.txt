@@ -1,0 +1,76 @@
+================================================================================
+INTELLIGENT MiniMD Communication Phase Analysis - Version 15.0
+================================================================================
+
+OPTIMIZATION PROFILE:
+--------------------------------------------------
+Profile: network_optimized
+Description: Network-optimized for Ethernet (eno1, eno2)
+Recommended for: High network traffic, many small messages
+Command: mpirun -np 32 --oversubscribe --mca btl tcp,self --mca btl_tcp_if_include eno1,eno2 --mca btl_tcp_port_min_v4 60000 --mca btl_tcp_port_max_v4 61000 ./miniMD_openmpi -i in.lj.miniMD
+Environment variables: {'OMPI_MCA_btl': 'tcp,self', 'OMPI_MCA_btl_tcp_if_include': 'eno1,eno2', 'OMPI_MCA_btl_tcp_eager_limit': '524288'}
+
+EMPIRICAL SCALING CONTEXT:
+--------------------------------------------------
+Expected MPI ranks: 32
+Detected MPI ranks: 33
+Expected communication: 96.9%
+Expected compute: 1.9%
+
+PHASE ANALYSIS:
+--------------------------------------------------
+COMMUNICATION            :    57.74s ( 98.55%) | Samples:     1 | Avg: 57.741s | Transitions: 1
+IDLE                     :     0.42s (  0.72%) | Samples:     1 | Avg:  0.423s | Transitions: 0
+
+Total monitored time: 58.59s
+Total tracked phase time: 58.16s
+Total phase changes: 1
+
+PERFORMANCE VALIDATION:
+--------------------------------------------------
+Detected communication: 98.55%
+Expected communication: 96.9%
+Difference: +1.65%
+✓ Excellent match with expectations!
+
+================================================================================
+OPTIMIZATION RECOMMENDATIONS:
+================================================================================
+
+Based on your configuration (33 ranks), consider these profiles:
+
+1. network_optimized:
+   Description: Network-optimized for Ethernet (eno1, eno2)
+   Reason: Network optimization crucial for communication-bound workloads
+   Command: mpirun -np 33 --oversubscribe --mca btl tcp,self --mca btl_tcp_if_include eno1,eno2 --mca btl_tcp_port_min_v4 60000 --mca btl_tcp_port_max_v4 61000 ./miniMD_openmpi -i in.lj.miniMD
+
+2. memory_optimized:
+   Description: Memory and buffer optimizations
+   Reason: Large buffers help with many small messages
+   Command: mpirun -np 33 --oversubscribe --mca pml_ob1_rdma_buffer_size 16777216 --mca pml_ob1_send_buffer_size 16777216 --mca pml_ob1_recv_buffer_size 16777216 ./miniMD_openmpi -i in.lj.miniMD
+
+================================================================================
+RANK-AWARE ANALYSIS:
+================================================================================
+
+WORKLOAD CHARACTERIZATION: COMMUNICATION-BOUND (High Ranks)
+  - Communication overhead dominates (75-97%)
+  - Problem size per rank is small
+  - Limited by MPI communication latency/bandwidth
+
+RECOMMENDED OPTIMIZATIONS:
+  - Network optimization (buffer sizes, protocols)
+  - Reduce MPI rank count, increase OpenMP threads
+  - Optimize message sizes and collective algorithms
+
+================================================================================
+NEXT STEPS FOR PERFORMANCE ANALYSIS:
+================================================================================
+
+1. Test different optimization profiles:
+   python script.py --profile tuned --ranks 16
+   python script.py --profile hybrid_4threads --ranks 8
+2. Compare results across profiles
+3. Check detailed scaling analysis: scaling_analysis_20260121_163929.json
+4. Review optimization report: optimization_report_20260121_163929.json
+5. Try different rank counts to find optimal configuration

@@ -1,0 +1,1 @@
+timestamp,phase,confidence,total_power_W,power_per_rank_W,cpu_user_pct,cpu_system_pct,cpu_idle_pct,cpu_iowait_pct,active_cpu_pct,ctx_rate,actual_ranks,reasons

@@ -1,0 +1,10 @@
+================ RESULTS ================
+Runtime Impact: +0.00%
+Energy Savings:  J (0.00%)
+Baseline Avg Power:    W
+Controlled Avg Power:  W
+Logs:
+  Baseline:    run_20260405_085302_n2/baseline.log
+  Controlled:  run_20260405_085302_n2/controlled.log
+  Controller:  run_20260405_085302_n2/controller.log
+  Summary:     run_20260405_085302_n2/summary.txt

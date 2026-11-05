@@ -1,0 +1,36 @@
+[frnt115.frontenac.local:3609727] MCW rank 0 bound to socket 0[core 0[hwt 0]]: [B/././././././././././././././././././././././././././././././.]
+[frnt115.frontenac.local:3609727] MCW rank 1 bound to socket 0[core 1[hwt 0]]: [./B/./././././././././././././././././././././././././././././.]
+# Create System:
+# Done .... 
+# miniMD-Reference 2.0 (MPI+OpenMP) output ...
+# Run Settings: 
+	# MPI processes: 2
+	# OpenMP threads: 1
+	# Inputfile: in.lj.miniMD
+	# Datafile: None
+# Physics Settings: 
+	# ForceStyle: LJ
+	# Force Parameters: 1.00 1.00
+	# Units: LJ
+	# Atoms: 8388608
+	# Atom types: 4
+	# System size: 214.99 214.99 214.99 (unit cells: 128 128 128)
+	# Density: 0.844200
+	# Force cutoff: 2.500000
+	# Timestep size: 0.005000
+# Technical Settings: 
+	# Neigh cutoff: 2.800000
+	# Half neighborlists: 1
+	# Neighbor bins: 106 106 106
+	# Neighbor frequency: 20
+	# Sorting frequency: 20
+	# Thermo frequency: 100
+	# Ghost Newton: 1
+	# Use intrinsics: 0
+	# Do safe exchange: 0
+	# Size of float: 8
+# Communication Phase Settings:
+	# Comm phase enabled: 1
+	# Comm stand-in size: 309 MB
+	# Comm chunk size: 1024 KB
+

@@ -1,0 +1,19 @@
+# Serial phase testing input
+# Focused on initialization and single-threaded computation
+
+# Grid dimensions
+nx = 50
+ny = 50
+nz = 50
+
+# Solver parameters
+max_iterations = 100
+tolerance = 1.0e-8
+
+# Serial testing configuration
+force_serial_execution = true
+disable_parallel_sections = true
+
+# Output control
+output_frequency = 10
+timing_output = detailed

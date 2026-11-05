@@ -1,0 +1,2 @@
+timestamp,profile,phase,cpu_usage,memory_usage,context_switches,network_usage
+1769054773.3584352,hybrid_4threads,COMMUNICATION,0.10,5.88,15897787233,1176118.97

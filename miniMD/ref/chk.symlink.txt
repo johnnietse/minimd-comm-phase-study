@@ -1,0 +1,4 @@
+On the cluster this was a symbolic link:
+  miniMD/ref/chk -> /lscratch/slurm-job-3121370-1/chk
+It pointed into the node-local scratch of Slurm job 3121370, which no longer exists,
+so the link was already dangling on 2026-11-05 and had no content to back up.

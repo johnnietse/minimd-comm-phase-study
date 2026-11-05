@@ -1,0 +1,10 @@
+================ RESULTS ================
+Runtime Impact: +4.61%
+Energy Savings: -3904.669486 J (-10.17%)
+Baseline Avg Power:   69.363185 W
+Controlled Avg Power: 73.048819 W
+Logs:
+  Baseline:    run_20260405_091442_n1/baseline.log
+  Controlled:  run_20260405_091442_n1/controlled.log
+  Controller:  run_20260405_091442_n1/controller.log
+  Summary:     run_20260405_091442_n1/summary.txt

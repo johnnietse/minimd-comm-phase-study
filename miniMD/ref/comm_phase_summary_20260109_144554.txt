@@ -1,0 +1,74 @@
+================================================================================
+INTELLIGENT MiniMD Communication Phase Analysis - Version 10.0
+================================================================================
+
+EMPIRICAL SCALING CONTEXT:
+--------------------------------------------------
+Expected MPI ranks: 32
+Expected communication: 96.9%
+Expected compute: 1.9%
+
+MINIMD GROUND TRUTH:
+--------------------------------------------------
+mpi_procs                : 32
+t_total                  : 10.280
+t_comm                   : 9.961
+t_force                  : 0.195
+comm_percentage          : 96.900
+compute_percentage       : 1.900
+
+PHASE ANALYSIS:
+--------------------------------------------------
+COMMUNICATION            :    10.84s ( 63.19%) | Samples:     6 | Avg:  1.807s | Transitions: 5
+IDLE                     :     6.30s ( 36.72%) | Samples:     5 | Avg:  1.260s | Transitions: 5
+
+Total monitored time: 17.16s
+Total tracked phase time: 17.15s
+
+PERFORMANCE VALIDATION:
+--------------------------------------------------
+Detected communication: 63.19%
+Expected communication: 96.9%
+Difference: -33.71%
+⚠ Significant deviation from expectations
+
+MiniMD actual communication: 96.90%
+Difference from MiniMD: -33.71%
+
+================================================================================
+SCALING AND OPTIMIZATION RECOMMENDATIONS:
+================================================================================
+
+WORKLOAD CHARACTERIZATION: COMMUNICATION-BOUND
+  - Communication overhead dominates
+  - Problem size per rank is small
+  - Limited by MPI communication latency/bandwidth
+
+RECOMMENDED ACTIONS:
+  1. Reduce MPI communication frequency
+  2. Increase problem size per rank
+  3. Use non-blocking communication
+  4. Consider larger aggregate problem size
+
+MPI-SPECIFIC OPTIMIZATIONS:
+--------------------------------------------------
+For medium rank counts:
+  - Optimize collective operations
+  - Balance communication across all ranks
+  - Consider topology-aware MPI
+
+HARDWARE CONSIDERATIONS:
+--------------------------------------------------
+  - Focus on low-latency network (InfiniBand)
+  - Consider network topology optimization
+  - Ensure balanced network traffic
+
+================================================================================
+NEXT STEPS FOR PERFORMANCE ANALYSIS:
+================================================================================
+
+1. Run with different MPI ranks to validate scaling behavior
+2. Use MPI profiling tools (mpiP, IPM, TAU) for detailed analysis
+3. Analyze network traffic patterns
+4. Consider algorithmic improvements for better scaling
+5. Compare with scaling analysis in: scaling_analysis_20260109_144554.json

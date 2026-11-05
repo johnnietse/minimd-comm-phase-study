@@ -1,0 +1,7 @@
+# Extreme problem size for memory testing
+nx = 200
+ny = 200
+nz = 200
+max_iterations = 500
+tolerance = 1.0e-10
+output_frequency = 0

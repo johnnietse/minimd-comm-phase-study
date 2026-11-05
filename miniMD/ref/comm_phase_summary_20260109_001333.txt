@@ -1,0 +1,49 @@
+================================================================================
+MiniMD Communication Phase Analysis - Version 10.0 (ADAPTIVE)
+================================================================================
+
+GROUND TRUTH FROM miniMD OUTPUT:
+----------------------------------------
+t_total             : Parse from miniMD output
+t_comm              : Parse from miniMD output
+t_force             : Parse from miniMD output
+t_neigh             : Parse from miniMD output
+t_other             : Parse from miniMD output
+comm_percentage     : Parse from miniMD output
+
+STATISTICAL BASELINES ESTABLISHED:
+----------------------------------------
+
+PHASE DURATION ANALYSIS:
+----------------------------------------
+INITIALIZING             :    7.40s ( 87.6%) | Samples:   37 | Avg: 0.200s
+
+Total monitored time: 8.45s
+Total tracked phase time: 7.40s
+
+================================================================================
+OPTIMIZATION RECOMMENDATIONS (BASED ON MEASUREMENTS):
+================================================================================
+
+MPI SIZE ANALYSIS (3 ranks):
+----------------------------------------
+1. SMALL MPI SIZE (≤4 ranks):
+   - Computation dominates (check compute percentage)
+   - Focus on compute optimization
+   - Consider reducing communication frequency
+
+2. WORKLOAD CHARACTERIZATION (0.0% communication):
+----------------------------------------
+   - COMPUTE-DOMINATED WORKLOAD
+   - Focus on: Vectorization, threading, algorithm optimization
+   - Secondary: Reduce MPI overhead where possible
+
+3. SPECIFIC OPTIMIZATIONS BASED ON METRICS:
+----------------------------------------
+
+4. GENERAL RECOMMENDATIONS:
+----------------------------------------
+   - Reduce message sizes (ghost cell optimization)
+   - Use MPI_Iallreduce for global operations
+   - Consider communication-computation overlap
+   - Profile with hardware counters for deeper insights

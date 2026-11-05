@@ -1,0 +1,1 @@
+timestamp,phase,confidence,power_W,dram_power_W,cpu_user_pct,cpu_system_pct,cpu_idle_pct,cpu_iowait_pct,voluntary_ctx_switches_per_sec,active_mpi_ranks,net_recv_mbps,net_sent_mbps,sync_variance_pct,pkg_energy_J,dram_energy_J,reasons

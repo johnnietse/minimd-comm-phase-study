@@ -1,0 +1,2183 @@
+diff --git a/ref/Makefile.openmpi b/ref/Makefile.openmpi
+index 1c91cb4..daaadfb 100644
+--- a/ref/Makefile.openmpi
++++ b/ref/Makefile.openmpi
+@@ -1,6 +1,7 @@
+ # Makefile for mpicxx compiler
+ 
+ SHELL = /bin/sh
++EXE = miniMD_openmpi 
+ 
+ # Default Options
+ 
+@@ -61,6 +62,20 @@ CCFLAGS += -DPREC_TIMER
+ USRLIB += -lrt
+ endif
+ 
++
++
++# Source and Header files
++# Add to SRC list
++SRC = ljs.cpp input.cpp integrate.cpp atom.cpp force_lj.cpp force_eam.cpp neighbor.cpp \
++    thermo.cpp comm.cpp timer.cpp output.cpp setup.cpp comm_monitor.cpp comm_instrumented.cpp
++
++# Add to INC list  
++INC = ljs.h atom.h force.h neighbor.h thermo.h timer.h comm.h integrate.h threadData.h variant.h openmp.h \
++    force_lj.h force_eam.h types.h comm_monitor.h comm_instrumented.h
++
++
++OBJ = $(SRC:.cpp=.o)
++
+ # Link rule
+ 
+ $(EXE):	$(OBJ)
+@@ -76,3 +91,7 @@ $(EXE):	$(OBJ)
+ # Individual dependencies
+ 
+ $(OBJ): $(INC)
++
++
++clean:
++	rm -f *.o *.2.cpp $(EXE)
+diff --git a/ref/comm.h b/ref/comm.h
+index 5d5d66e..b812882 100644
+--- a/ref/comm.h
++++ b/ref/comm.h
+@@ -42,11 +42,11 @@ class Comm
+     Comm();
+     ~Comm();
+     int setup(MMD_float, Atom &);
+-    void communicate(Atom &);
+-    void reverse_communicate(Atom &);
+-    void exchange(Atom &);
+-    void exchange_all(Atom &);
+-    void borders(Atom &);
++    virtual void communicate(Atom &);
++    virtual void reverse_communicate(Atom &);
++    virtual void exchange(Atom &);
++    virtual void exchange_all(Atom &);
++    virtual void borders(Atom &);
+     void growsend(int);
+     void growrecv(int);
+     void growlist(int, int);
+diff --git a/ref/in.lj.miniMD b/ref/in.lj.miniMD
+index 6916071..3df6798 100644
+--- a/ref/in.lj.miniMD
++++ b/ref/in.lj.miniMD
+@@ -1,14 +1,15 @@
+ Lennard-Jones input file for miniMD
+ 
+-lj             units (lj or metal)
+-none           data file (none or filename)       
+-lj	       force style (lj or eam)
+-1.0 1.0        LJ parameters (epsilon and sigma; COMD: 0.167 / 2.315)
+-32 32 32       size of problem
+-100            timesteps
+-0.005          timestep size 
+-1.44           initial temperature 
+-0.8442         density 
+-20             reneighboring every this many steps
+-2.5 0.30       force cutoff and neighbor skin 
+-100            thermo calculation every this many steps (0 = start,end)
++ lj           # units (lj or metal)
++ none         # data file (none or filename)
++ lj           # force style (lj or eam)
++ 1.0 1.0      # LJ parameters (epsilon sigma)
++ 128 128 128     # size of problem
++ 100          # timesteps
++ 0.005        # timestep size
++ 1.44         # initial temperature
++ 0.8442       # density
++ 20           # reneighboring every this many steps
++ 2.5 0.30     # force cutoff and neighbor skin
++ 100          # thermo calculation every this many steps (0 = start,end)
++
+diff --git a/ref/integrate.cpp b/ref/integrate.cpp
+index 1833eab..3079d71 100644
+--- a/ref/integrate.cpp
++++ b/ref/integrate.cpp
+@@ -1,3 +1,4 @@
++
+ /* ----------------------------------------------------------------------
+    miniMD is a simple, parallel molecular dynamics (MD) code.   miniMD is
+    an MD microapplication in the Mantevo project at Sandia National
+@@ -28,25 +29,685 @@
+ 
+    Please read the accompanying README and LICENSE files.
+ ---------------------------------------------------------------------- */
+-//#define PRINTDEBUG(a) a
++// #define PRINTDEBUG(a) a
+ #define PRINTDEBUG(a)
+-#include "stdio.h"
++
+ #include "integrate.h"
+-#include "openmp.h"
+ #include "math.h"
++#include "openmp.h"
++#include "stdio.h"
+ 
+-Integrate::Integrate() {sort_every=20;}
+-Integrate::~Integrate() {}
++#include <cerrno>
++#include <cstdint>
++#include <cstdio>
++#include <cstdlib>
++#include <cstring>
++#include <dirent.h>
++#include <fcntl.h>
++#include <fstream>
++#include <iostream>
++#include <mpi.h>
++#include <sched.h>
++#include <sys/mman.h>
++#include <sys/stat.h>
++#include <sys/types.h>
++#include <time.h>
++#include <unistd.h>
++#include <vector>
++
++
++// ========================================================================
++// DEFAULTS FOR SYNTHETIC COMMUNICATION DURATION
++// ========================================================================
++static const double DEFAULT_COMM_TARGET_DURATION_SEC = 30.0;
++static const int DEFAULT_COMM_SLEEP_US = 0;
++
++// ========================================================================
++// SHARED-MEMORY PHASE HINTS FOR THE PYTHON MONITOR
++// ========================================================================
++
++enum PhaseCode : uint32_t {
++  PHASE_COMPUTE = 0,
++  PHASE_COMMUNICATE = 1,
++  PHASE_EXCHANGE = 2,
++  PHASE_BORDERS = 3,
++  PHASE_REVERSE = 4,
++  PHASE_IO = 5,
++  PHASE_SYNTH_ACTIVE = 6,
++  PHASE_SYNTH_WAIT = 7,
++  PHASE_DONE = 8
++};
++
++struct PhaseSlot {
++  volatile uint32_t seq;
++  volatile int32_t rank;
++  volatile int32_t core;
++  volatile uint32_t phase;
++  volatile uint64_t t_ns;
++};
++
++static const uint32_t PHASE_MAGIC = 0x50485331u; // "PHS1"
++static const int MAX_PHASE_SLOTS = 64;
++
++struct PhaseTable {
++  uint32_t magic;
++  uint32_t nslots;
++  PhaseSlot slots[MAX_PHASE_SLOTS];
++};
++
++static PhaseTable *g_phase_table = nullptr;
++static int g_phase_fd = -1;
++static int g_phase_rank = -1;
++
++static const char *phase_hint_path() {
++  const char *p = std::getenv("PHASE_HINT_PATH");
++  return (p && p[0]) ? p : "/dev/shm/minimd_phase_hints.bin";
++}
++
++static uint64_t monotonic_ns() {
++  struct timespec ts;
++  clock_gettime(CLOCK_MONOTONIC, &ts);
++  return static_cast<uint64_t>(ts.tv_sec) * 1000000000ull +
++         static_cast<uint64_t>(ts.tv_nsec);
++}
++
++static void phase_hint_write(uint32_t phase) {
++  if (!g_phase_table || g_phase_rank < 0 || g_phase_rank >= MAX_PHASE_SLOTS)
++    return;
++
++  PhaseSlot &s = g_phase_table->slots[g_phase_rank];
++
++  uint32_t seq = s.seq + 1; // odd = write in progress
++  s.seq = seq;
++  __sync_synchronize();
++
++  s.rank = g_phase_rank;
++  s.core = sched_getcpu();
++  s.phase = phase;
++  s.t_ns = monotonic_ns();
++
++  __sync_synchronize();
++  s.seq = seq + 1; // even = stable snapshot
++}
++
++static void phase_hint_init(int me, int nprocs) {
++  const char *path = phase_hint_path();
++
++  if (me == 0) {
++    int fd = ::open(path, O_CREAT | O_RDWR | O_TRUNC, 0666);
++    if (fd >= 0) {
++      if (::ftruncate(fd, sizeof(PhaseTable)) == 0) {
++        void *mem = ::mmap(nullptr, sizeof(PhaseTable), PROT_READ | PROT_WRITE,
++                           MAP_SHARED, fd, 0);
++        if (mem != MAP_FAILED) {
++          std::memset(mem, 0, sizeof(PhaseTable));
++          PhaseTable *t = reinterpret_cast<PhaseTable *>(mem);
++          t->magic = PHASE_MAGIC;
++          t->nslots = (nprocs < MAX_PHASE_SLOTS) ? nprocs : MAX_PHASE_SLOTS;
++          ::msync(mem, sizeof(PhaseTable), MS_SYNC);
++          ::munmap(mem, sizeof(PhaseTable));
++        }
++      }
++      ::close(fd);
++    }
++  }
++
++  MPI_Barrier(MPI_COMM_WORLD);
++
++  g_phase_fd = ::open(path, O_RDWR, 0666);
++  if (g_phase_fd < 0)
++    return;
++
++  void *mem = ::mmap(nullptr, sizeof(PhaseTable), PROT_READ | PROT_WRITE,
++                     MAP_SHARED, g_phase_fd, 0);
++  if (mem == MAP_FAILED) {
++    ::close(g_phase_fd);
++    g_phase_fd = -1;
++    return;
++  }
++
++  g_phase_table = reinterpret_cast<PhaseTable *>(mem);
++  g_phase_rank = me;
++  phase_hint_write(PHASE_COMPUTE);
++}
++
++static void phase_hint_fini(int me) {
++  phase_hint_write(PHASE_DONE);
++  MPI_Barrier(MPI_COMM_WORLD);
++
++  if (g_phase_table) {
++    ::munmap(g_phase_table, sizeof(PhaseTable));
++    g_phase_table = nullptr;
++  }
++
++  if (g_phase_fd >= 0) {
++    ::close(g_phase_fd);
++    g_phase_fd = -1;
++  }
++
++  if (me == 0) {
++    ::unlink(phase_hint_path());
++  }
++}
++
++// ========================================================================
++// EMBEDDED CHECKPOINT FUNCTIONS (from Gia's I/O phase code)
++// ========================================================================
++
++// Clean checkpoint directory on rank 0 (remove old checkpoint files)
++// NOTE: Only removes FILES, not the directory itself (preserves symlinks!)
++static void clean_checkpoint_dir(const char *dir) {
++  int me = 0;
++  MPI_Comm_rank(MPI_COMM_WORLD, &me);
++  if (me != 0)
++    return;
++
++  if (dir == nullptr || dir[0] == '\0')
++    return;
++
++  struct stat st;
++  if (stat(dir, &st) != 0 || !S_ISDIR(st.st_mode)) {
++    return;
++  }
++
++  DIR *dirp = opendir(dir);
++  if (dirp == nullptr) {
++    std::fprintf(stderr,
++                 "WARNING: Could not open checkpoint dir %s for cleanup: %s\n",
++                 dir, std::strerror(errno));
++    return;
++  }
++
++  struct dirent *entry;
++  int removed_count = 0;
++  while ((entry = readdir(dirp)) != nullptr) {
++    if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
++      continue;
++    }
++
++    char filepath[1024];
++    snprintf(filepath, sizeof(filepath), "%s/%s", dir, entry->d_name);
++
++    struct stat file_st;
++    if (stat(filepath, &file_st) == 0 && S_ISREG(file_st.st_mode)) {
++      if (unlink(filepath) == 0) {
++        removed_count++;
++      } else {
++        std::fprintf(stderr, "WARNING: Could not remove %s: %s\n", filepath,
++                     std::strerror(errno));
++      }
++    }
++  }
++
++  closedir(dirp);
++
++  if (removed_count > 0) {
++    std::printf("Cleaned %d old checkpoint file(s) from %s/\n", removed_count,
++                dir);
++  }
++}
++
++// Make directory on rank 0 (best-effort)
++static void mkdir_rank0(const char *dir) {
++  int me = 0;
++  MPI_Comm_rank(MPI_COMM_WORLD, &me);
++  if (me != 0)
++    return;
++
++  if (dir == nullptr || dir[0] == '\0')
++    return;
++
++  struct stat st;
++  if (stat(dir, &st) == 0 && S_ISDIR(st.st_mode))
++    return;
++
++  if (mkdir(dir, 0755) != 0 && errno != EEXIST) {
++    std::fprintf(stderr, "ERROR: mkdir(%s) failed: %s\n", dir,
++                 std::strerror(errno));
++  }
++}
++
++// End-of-simulation checkpoint function that scales with atom count
++// Writes actual simulation data (positions, velocities, forces)
++static void write_checkpoint_sustained_io(const Atom &atom, const Comm &comm,
++                                          int step, const char *out_dir,
++                                          double target_duration_sec,
++                                          size_t chunk_bytes, int sleep_us,
++                                          int fsync_each_chunk) {
++  int me = 0;
++  int nprocs = 1;
++  MPI_Comm_rank(MPI_COMM_WORLD, &me);
++  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
++
++  const char *dir = (out_dir && out_dir[0]) ? out_dir : "chk";
++
++  clean_checkpoint_dir(dir);
++  mkdir_rank0(dir);
++
++  MPI_Barrier(MPI_COMM_WORLD);
++
++  double io_start_time = MPI_Wtime();
++
++  char fname[512];
++  std::snprintf(fname, sizeof(fname), "%s/checkpoint_step%08d_rank%05d.bin",
++                dir, step, me);
+ 
+-void Integrate::setup()
+-{
+-  dtforce = 0.5 * dt;
++  int fd = ::open(fname, O_CREAT | O_TRUNC | O_WRONLY, 0644);
++  if (fd < 0) {
++    std::fprintf(stderr, "ERROR: cannot open %s: %s\n", fname,
++                 std::strerror(errno));
++    MPI_Barrier(MPI_COMM_WORLD);
++    return;
++  }
++
++  struct CheckpointHeader {
++    int32_t nlocal;
++    int32_t nghost;
++    int32_t ntypes;
++    int32_t step;
++    int32_t rank;
++    int32_t nprocs;
++    double box_xlo, box_xhi;
++    double box_ylo, box_yhi;
++    double box_zlo, box_zhi;
++    double box_xprd, box_yprd, box_zprd;
++  } header;
++
++  header.nlocal = atom.nlocal;
++  header.nghost = atom.nghost;
++  header.ntypes = atom.ntypes;
++  header.step = step;
++  header.rank = me;
++  header.nprocs = nprocs;
++  header.box_xlo = atom.box.xlo;
++  header.box_xhi = atom.box.xhi;
++  header.box_ylo = atom.box.ylo;
++  header.box_yhi = atom.box.yhi;
++  header.box_zlo = atom.box.zlo;
++  header.box_zhi = atom.box.zhi;
++  header.box_xprd = atom.box.xprd;
++  header.box_yprd = atom.box.yprd;
++  header.box_zprd = atom.box.zprd;
++
++  std::vector<MMD_float> positions(atom.nlocal * 3);
++  for (int i = 0; i < atom.nlocal; i++) {
++    positions[i * 3 + 0] = atom.x[i * PAD + 0];
++    positions[i * 3 + 1] = atom.x[i * PAD + 1];
++    positions[i * 3 + 2] = atom.x[i * PAD + 2];
++  }
++
++  std::vector<MMD_float> velocities(atom.nlocal * 3);
++  for (int i = 0; i < atom.nlocal; i++) {
++    velocities[i * 3 + 0] = atom.v[i * PAD + 0];
++    velocities[i * 3 + 1] = atom.v[i * PAD + 1];
++    velocities[i * 3 + 2] = atom.v[i * PAD + 2];
++  }
++
++  std::vector<MMD_float> forces(atom.nlocal * 3);
++  for (int i = 0; i < atom.nlocal; i++) {
++    forces[i * 3 + 0] = atom.f[i * PAD + 0];
++    forces[i * 3 + 1] = atom.f[i * PAD + 1];
++    forces[i * 3 + 2] = atom.f[i * PAD + 2];
++  }
++
++  size_t total_data_bytes =
++      sizeof(header) + positions.size() * sizeof(MMD_float) +
++      velocities.size() * sizeof(MMD_float) + forces.size() * sizeof(MMD_float);
++
++  if (atom.type) {
++    total_data_bytes += static_cast<size_t>(atom.nlocal) * sizeof(int);
++  }
++
++  std::vector<unsigned char> all_data;
++  all_data.reserve(total_data_bytes);
++
++  const unsigned char *header_ptr =
++      reinterpret_cast<const unsigned char *>(&header);
++  all_data.insert(all_data.end(), header_ptr, header_ptr + sizeof(header));
++
++  const unsigned char *pos_ptr =
++      reinterpret_cast<const unsigned char *>(positions.data());
++  all_data.insert(all_data.end(), pos_ptr,
++                  pos_ptr + positions.size() * sizeof(MMD_float));
++
++  const unsigned char *vel_ptr =
++      reinterpret_cast<const unsigned char *>(velocities.data());
++  all_data.insert(all_data.end(), vel_ptr,
++                  vel_ptr + velocities.size() * sizeof(MMD_float));
++
++  const unsigned char *force_ptr =
++      reinterpret_cast<const unsigned char *>(forces.data());
++  all_data.insert(all_data.end(), force_ptr,
++                  force_ptr + forces.size() * sizeof(MMD_float));
++
++  if (atom.type) {
++    const unsigned char *type_ptr =
++        reinterpret_cast<const unsigned char *>(atom.type);
++    all_data.insert(all_data.end(), type_ptr,
++                    type_ptr + atom.nlocal * sizeof(int));
++  }
++
++  if (chunk_bytes == 0)
++    chunk_bytes = 1024 * 1024;
++  if (target_duration_sec <= 0.0)
++    target_duration_sec = 30.0;
++
++  size_t bytes_written = 0;
++  size_t chunk_count = 0;
++  double elapsed = 0.0;
++
++  if (me == 0) {
++    std::printf("\n=== Starting Sustained I/O Checkpoint ===\n");
++    std::printf("Chunk size: %.2f MB\n", chunk_bytes / (1024.0 * 1024.0));
++    std::printf("Sleep between chunks: %d microseconds\n", sleep_us);
++    std::printf("Data to write per rank: %.2f MB\n",
++                all_data.size() / (1024.0 * 1024.0));
++  }
++
++  while (bytes_written < all_data.size() && elapsed < target_duration_sec) {
++    size_t bytes_remaining = all_data.size() - bytes_written;
++    size_t this_chunk_size =
++        (bytes_remaining < chunk_bytes) ? bytes_remaining : chunk_bytes;
++
++    const unsigned char *write_ptr = all_data.data() + bytes_written;
++    size_t written_now = 0;
++    while (written_now < this_chunk_size) {
++      ssize_t result =
++          ::write(fd, write_ptr + written_now, this_chunk_size - written_now);
++      if (result < 0) {
++        if (errno == EINTR)
++          continue;
++        std::fprintf(stderr, "ERROR: write failed on rank %d: %s\n", me,
++                     std::strerror(errno));
++        ::close(fd);
++        MPI_Barrier(MPI_COMM_WORLD);
++        return;
++      }
++      written_now += static_cast<size_t>(result);
++    }
++
++    if (fsync_each_chunk) {
++      ::fsync(fd);
++    }
++
++    bytes_written += this_chunk_size;
++    chunk_count++;
++
++    elapsed = MPI_Wtime() - io_start_time;
++  }
++
++  if (elapsed < target_duration_sec && bytes_written >= all_data.size()) {
++    if (me == 0) {
++      std::printf("All checkpoint data written (%.2f MB in %.2f seconds). "
++                  "Continuing I/O with padding to reach %.1f seconds...\n",
++                  bytes_written / (1024.0 * 1024.0), elapsed,
++                  target_duration_sec);
++    }
++
++    std::vector<unsigned char> padding_buf(chunk_bytes);
++    for (size_t i = 0; i < padding_buf.size(); i++) {
++      padding_buf[i] = static_cast<unsigned char>(
++          (i + 173u * static_cast<unsigned>(me)) & 0xFFu);
++    }
++
++    while (elapsed < target_duration_sec) {
++      const unsigned char *pad_ptr = padding_buf.data();
++      size_t remaining = padding_buf.size();
++      while (remaining > 0) {
++        ssize_t result = ::write(fd, pad_ptr, remaining);
++        if (result < 0) {
++          if (errno == EINTR)
++            continue;
++          break;
++        }
++        pad_ptr += static_cast<size_t>(result);
++        remaining -= static_cast<size_t>(result);
++      }
++
++      if (fsync_each_chunk) {
++        ::fsync(fd);
++      }
++
++      bytes_written += chunk_bytes;
++      chunk_count++;
++
++      if (sleep_us > 0) {
++        ::usleep(static_cast<useconds_t>(sleep_us));
++      }
++
++      elapsed = MPI_Wtime() - io_start_time;
++    }
++  }
++
++  ::fsync(fd);
++  ::close(fd);
++
++  double io_end_time = MPI_Wtime();
++  double actual_duration = io_end_time - io_start_time;
++
++  if (me == 0) {
++    double total_mb = static_cast<double>(bytes_written) / (1024.0 * 1024.0);
++    double data_mb = static_cast<double>(all_data.size()) / (1024.0 * 1024.0);
++    double avg_bw = total_mb / actual_duration;
++
++    std::printf("\n=== I/O Checkpoint Complete ===\n");
++    std::printf("Actual I/O duration: %.2f seconds\n", actual_duration);
++    std::printf("Checkpoint data written: %.2f MB per rank\n", data_mb);
++    std::printf("Total written (with padding): %.2f MB per rank\n", total_mb);
++    std::printf("Number of chunks: %zu\n", chunk_count);
++    std::printf("Average bandwidth: %.2f MB/s per rank\n", avg_bw);
++    std::printf("=====================================\n\n");
++  }
++
++  MPI_Barrier(MPI_COMM_WORLD);
++
++  (void)comm;
++}
++
++// ========================================================================
++// END OF EMBEDDED CHECKPOINT FUNCTIONS
++// ========================================================================
++
++// ========================================================================
++// COMMUNICATION PHASE (Johnnie)
++// Simulates network communication by sending checkpoint-equivalent data
++// through MPI on rank 0 only. Other ranks wait at MPI_Barrier.
++// Extended to sustain communication up to target_duration_sec.
++// ========================================================================
++
++static size_t calculate_per_rank_data_bytes(const Atom &atom) {
++  size_t header_bytes = 6 * sizeof(int32_t) + 9 * sizeof(double);
++  size_t array_bytes =
++      static_cast<size_t>(atom.nlocal) * 3 * sizeof(MMD_float) * 3;
++
++  size_t type_bytes = 0;
++  if (atom.type) {
++    type_bytes = static_cast<size_t>(atom.nlocal) * sizeof(int);
++  }
++
++  return header_bytes + array_bytes + type_bytes;
+ }
+ 
+-void Integrate::initialIntegrate()
+-{
++static void simulate_network_communication(const Atom &atom, int nprocs,
++                                           size_t standin_total_bytes,
++                                           size_t chunk_kb,
++                                           double target_duration_sec,
++                                           int sleep_us) {
++  int me = 0;
++  MPI_Comm_rank(MPI_COMM_WORLD, &me);
++
++  size_t per_rank_bytes = calculate_per_rank_data_bytes(atom);
++  size_t runtime_total_bytes = per_rank_bytes * static_cast<size_t>(nprocs);
++  size_t total_bytes = runtime_total_bytes;
++
++  if (target_duration_sec <= 0.0)
++    target_duration_sec = DEFAULT_COMM_TARGET_DURATION_SEC;
++
++  if (me == 0) {
++    std::printf("\n========================================\n");
++    std::printf("COMMUNICATION PHASE (Rank 0 Only)\n");
++    std::printf("========================================\n");
++    std::printf("Per-rank data (runtime): %.2f MB (%zu bytes)\n",
++                per_rank_bytes / (1024.0 * 1024.0), per_rank_bytes);
++    std::printf(
++        "Total data (runtime): %.2f MB (%zu bytes) [%d ranks × per-rank]\n",
++        runtime_total_bytes / (1024.0 * 1024.0), runtime_total_bytes, nprocs);
++    std::printf("Stand-in total: %.2f MB (%zu bytes)\n",
++                standin_total_bytes / (1024.0 * 1024.0), standin_total_bytes);
++
++    if (runtime_total_bytes < standin_total_bytes) {
++      std::printf("NOTE: Runtime total (%.2f MB) < stand-in (%.2f MB). Using "
++                  "stand-in.\n",
++                  runtime_total_bytes / (1024.0 * 1024.0),
++                  standin_total_bytes / (1024.0 * 1024.0));
++      total_bytes = standin_total_bytes;
++    } else {
++      std::printf("Using runtime total: %.2f MB\n",
++                  total_bytes / (1024.0 * 1024.0));
++    }
++
++    std::printf("Target communication duration: %.2f seconds\n",
++                target_duration_sec);
++    std::printf("Sleep between padding chunks: %d microseconds\n", sleep_us);
++  }
++
++  MPI_Bcast(&total_bytes, sizeof(size_t), MPI_BYTE, 0, MPI_COMM_WORLD);
++
++  if (me == 0)
++    phase_hint_write(PHASE_SYNTH_ACTIVE);
++  else
++    phase_hint_write(PHASE_SYNTH_WAIT);
++
++  MPI_Barrier(MPI_COMM_WORLD);
++
++  double comm_start = MPI_Wtime();
++
++  size_t bytes_sent = 0;
++  size_t chunk_count = 0;
++
++  if (me == 0) {
++    size_t chunk_bytes = chunk_kb * 1024;
++    if (chunk_bytes == 0)
++      chunk_bytes = 1024 * 1024;
++
++    size_t buf_size = (chunk_bytes < total_bytes) ? chunk_bytes : total_bytes;
++    if (buf_size == 0)
++      buf_size = 1024 * 1024;
++
++    std::vector<char> send_buf(buf_size);
++    std::vector<char> recv_buf(buf_size);
++
++    for (size_t i = 0; i < buf_size; i++) {
++      send_buf[i] = static_cast<char>((i * 7 + 13) & 0xFF);
++    }
++
++    double elapsed = 0.0;
++
++    std::printf("Starting MPI loopback send/recv (rank 0 -> rank 0)\n");
++    std::printf("Total required bytes: %.2f MB\n",
++                total_bytes / (1024.0 * 1024.0));
++    std::printf("Chunk size: %.2f KB\n", buf_size / 1024.0);
++
++    // 1) Send the actual checkpoint-equivalent amount first
++    while (bytes_sent < total_bytes && elapsed < target_duration_sec) {
++      size_t remaining = total_bytes - bytes_sent;
++      int this_chunk =
++          static_cast<int>((remaining < buf_size) ? remaining : buf_size);
++
++      MPI_Request send_req;
++      MPI_Isend(send_buf.data(), this_chunk, MPI_BYTE, 0, 99, MPI_COMM_WORLD,
++                &send_req);
++      MPI_Recv(recv_buf.data(), this_chunk, MPI_BYTE, 0, 99, MPI_COMM_WORLD,
++               MPI_STATUS_IGNORE);
++      MPI_Wait(&send_req, MPI_STATUS_IGNORE);
++
++      bytes_sent += static_cast<size_t>(this_chunk);
++      chunk_count++;
++      elapsed = MPI_Wtime() - comm_start;
++
++      if (chunk_count % (50 * 1024 * 1024 / (int)buf_size + 1) == 0) {
++        std::printf("  ... transferred %.2f / %.2f MB (elapsed %.2f s)\n",
++                    bytes_sent / (1024.0 * 1024.0),
++                    total_bytes / (1024.0 * 1024.0), elapsed);
++      }
++    }
++
++    // 2) If needed, keep padding the communication until target duration
++    if (elapsed < target_duration_sec) {
++      std::printf("Required communication finished in %.2f seconds. "
++                  "Continuing padding traffic to reach %.2f seconds...\n",
++                  elapsed, target_duration_sec);
++    }
++
++    while (elapsed < target_duration_sec) {
++      int this_chunk = static_cast<int>(buf_size);
++
++      MPI_Request send_req;
++      MPI_Isend(send_buf.data(), this_chunk, MPI_BYTE, 0, 99, MPI_COMM_WORLD,
++                &send_req);
++      MPI_Recv(recv_buf.data(), this_chunk, MPI_BYTE, 0, 99, MPI_COMM_WORLD,
++               MPI_STATUS_IGNORE);
++      MPI_Wait(&send_req, MPI_STATUS_IGNORE);
++
++      bytes_sent += static_cast<size_t>(this_chunk);
++      chunk_count++;
++
++      if (sleep_us > 0) {
++        ::usleep(static_cast<useconds_t>(sleep_us));
++      }
++
++      elapsed = MPI_Wtime() - comm_start;
++    }
++
++    std::printf("MPI loopback complete: %zu chunks, %.2f MB total traffic\n",
++                chunk_count, bytes_sent / (1024.0 * 1024.0));
++  }
++
++  MPI_Barrier(MPI_COMM_WORLD);
++
++  double comm_end = MPI_Wtime();
++  double comm_duration = comm_end - comm_start;
++
++  phase_hint_write(PHASE_COMPUTE);
++
++  if (me == 0) {
++    std::printf("\n=== Communication Phase Complete ===\n");
++    std::printf("Duration: %.3f seconds\n", comm_duration);
++    std::printf("Total traffic: %.2f MB\n", bytes_sent / (1024.0 * 1024.0));
++    std::printf("Effective bandwidth: %.2f MB/s\n",
++                bytes_sent / (1024.0 * 1024.0) / comm_duration);
++    std::printf("====================================\n\n");
++  }
++}
++
++// ========================================================================
++// END OF COMMUNICATION PHASE
++// ========================================================================
++
++Integrate::Integrate() {
++  sort_every = 20;
++
++  ckpt_interval = 0;
++  ckpt_dir = "chk";
++  ckpt_at_end = 1;
++
++  ckpt_io_duration_sec = 30.0;
++  ckpt_chunk_bytes = 1024 * 1024;
++  ckpt_sleep_us = 100000;
++  ckpt_fsync_chunks = 0;
++
++  comm_phase_enabled = 1;
++  comm_standin_bytes = (size_t)309 * 1024 * 1024;
++  comm_chunk_kb = 1024;
++}
++
++Integrate::~Integrate() {}
++
++void Integrate::setup() { dtforce = 0.5 * dt; }
++
++void Integrate::initialIntegrate() {
+   OMPFORSCHEDULE
+-  for(MMD_int i = 0; i < nlocal; i++) {
++  for (MMD_int i = 0; i < nlocal; i++) {
+     v[i * PAD + 0] += dtforce * f[i * PAD + 0];
+     v[i * PAD + 1] += dtforce * f[i * PAD + 1];
+     v[i * PAD + 2] += dtforce * f[i * PAD + 2];
+@@ -56,20 +717,17 @@ void Integrate::initialIntegrate()
+   }
+ }
+ 
+-void Integrate::finalIntegrate()
+-{
++void Integrate::finalIntegrate() {
+   OMPFORSCHEDULE
+-  for(MMD_int i = 0; i < nlocal; i++) {
++  for (MMD_int i = 0; i < nlocal; i++) {
+     v[i * PAD + 0] += dtforce * f[i * PAD + 0];
+     v[i * PAD + 1] += dtforce * f[i * PAD + 1];
+     v[i * PAD + 2] += dtforce * f[i * PAD + 2];
+   }
+-
+ }
+ 
+-void Integrate::run(Atom &atom, Force* force, Neighbor &neighbor,
+-                    Comm &comm, Thermo &thermo, Timer &timer)
+-{
++void Integrate::run(Atom &atom, Force *force, Neighbor &neighbor, Comm &comm,
++                    Thermo &thermo, Timer &timer) {
+   int i, n;
+ 
+   comm.timer = &timer;
+@@ -79,15 +737,24 @@ void Integrate::run(Atom &atom, Force* force, Neighbor &neighbor,
+ 
+   mass = atom.mass;
+   dtforce = dtforce / mass;
+-  //Use OpenMP threads only within the following loop containing the main loop.
+-  //Do not use OpenMP for setup and postprocessing.
+-  #pragma omp parallel private(i,n)
++
++  int checkpoint_step = ntimes / 2;
++
++  int me = 0, nprocs = 1;
++  MPI_Comm_rank(MPI_COMM_WORLD, &me);
++  MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
++
++  phase_hint_init(me, nprocs);
++
++// Use OpenMP threads only within the following loop containing the main loop.
++// Do not use OpenMP for setup and postprocessing.
++#pragma omp parallel private(i, n)
+   {
+-    int next_sort = sort_every>0?sort_every:ntimes+1;
++    int next_sort = sort_every > 0 ? sort_every : ntimes + 1;
+ 
+-    for(n = 0; n < ntimes; n++) {
++    for (n = 0; n < ntimes; n++) {
+ 
+-      #pragma omp barrier
++#pragma omp barrier
+ 
+       x = atom.x;
+       v = atom.v;
+@@ -97,111 +764,372 @@ void Integrate::run(Atom &atom, Force* force, Neighbor &neighbor,
+ 
+       initialIntegrate();
+ 
+-      #pragma omp master
+-      timer.stamp();
++#pragma omp master
++      {
++        phase_hint_write(PHASE_COMPUTE);
++        timer.stamp();
++      }
++
++      if ((n + 1) % neighbor.every) {
+ 
+-      if((n + 1) % neighbor.every) {
++#pragma omp master
++        {
++          phase_hint_write(PHASE_COMMUNICATE);
++        }
+ 
+         comm.communicate(atom);
+-        #pragma omp master
+-        timer.stamp(TIME_COMM);
++
++#pragma omp master
++        {
++          phase_hint_write(PHASE_COMPUTE);
++          timer.stamp(TIME_COMM);
++        }
+ 
+       } else {
+-        //these routines are not yet ported to OpenMP
+         {
+-          if(check_safeexchange) {
+-            #pragma omp master
++          if (check_safeexchange) {
++#pragma omp master
+             {
+               double d_max = 0;
+ 
+-              for(i = 0; i < atom.nlocal; i++) {
++              for (i = 0; i < atom.nlocal; i++) {
+                 double dx = (x[i * PAD + 0] - xold[i * PAD + 0]);
+ 
+-                if(dx > atom.box.xprd) dx -= atom.box.xprd;
++                if (dx > atom.box.xprd)
++                  dx -= atom.box.xprd;
+ 
+-                if(dx < -atom.box.xprd) dx += atom.box.xprd;
++                if (dx < -atom.box.xprd)
++                  dx += atom.box.xprd;
+ 
+                 double dy = (x[i * PAD + 1] - xold[i * PAD + 1]);
+ 
+-                if(dy > atom.box.yprd) dy -= atom.box.yprd;
++                if (dy > atom.box.yprd)
++                  dy -= atom.box.yprd;
+ 
+-                if(dy < -atom.box.yprd) dy += atom.box.yprd;
++                if (dy < -atom.box.yprd)
++                  dy += atom.box.yprd;
+ 
+                 double dz = (x[i * PAD + 2] - xold[i * PAD + 2]);
+ 
+-                if(dz > atom.box.zprd) dz -= atom.box.zprd;
++                if (dz > atom.box.zprd)
++                  dz -= atom.box.zprd;
+ 
+-                if(dz < -atom.box.zprd) dz += atom.box.zprd;
++                if (dz < -atom.box.zprd)
++                  dz += atom.box.zprd;
+ 
+                 double d = dx * dx + dy * dy + dz * dz;
+ 
+-                if(d > d_max) d_max = d;
++                if (d > d_max)
++                  d_max = d;
+               }
+ 
+               d_max = sqrt(d_max);
+ 
+-              if((d_max > atom.box.xhi - atom.box.xlo) || (d_max > atom.box.yhi - atom.box.ylo) || (d_max > atom.box.zhi - atom.box.zlo))
+-                printf("Warning: Atoms move further than your subdomain size, which will eventually cause lost atoms.\n"
+-                "Increase reneighboring frequency or choose a different processor grid\n"
+-                "Maximum move distance: %lf; Subdomain dimensions: %lf %lf %lf\n",
+-                d_max, atom.box.xhi - atom.box.xlo, atom.box.yhi - atom.box.ylo, atom.box.zhi - atom.box.zlo);
+-
++              if ((d_max > atom.box.xhi - atom.box.xlo) ||
++                  (d_max > atom.box.yhi - atom.box.ylo) ||
++                  (d_max > atom.box.zhi - atom.box.zlo))
++                printf("Warning: Atoms move further than your subdomain size, "
++                       "which will eventually cause lost atoms.\n"
++                       "Increase reneighboring frequency or choose a different "
++                       "processor grid\n"
++                       "Maximum move distance: %lf; Subdomain dimensions: %lf "
++                       "%lf %lf\n",
++                       d_max, atom.box.xhi - atom.box.xlo,
++                       atom.box.yhi - atom.box.ylo,
++                       atom.box.zhi - atom.box.zlo);
+             }
+-
+           }
+ 
++#pragma omp master
++          {
++            phase_hint_write(PHASE_EXCHANGE);
++            timer.stamp_extra_start();
++          }
+ 
+-          #pragma omp master
+-          timer.stamp_extra_start();
+           comm.exchange(atom);
+-          if(n+1>=next_sort) {
++
++          if (n + 1 >= next_sort) {
+             atom.sort(neighbor);
+-            next_sort +=  sort_every;
++            next_sort += sort_every;
++          }
++
++#pragma omp master
++          {
++            phase_hint_write(PHASE_BORDERS);
+           }
++
+           comm.borders(atom);
+-          #pragma omp master
++
++#pragma omp master
+           {
++            phase_hint_write(PHASE_COMPUTE);
+             timer.stamp_extra_stop(TIME_TEST);
+             timer.stamp(TIME_COMM);
+           }
+ 
+-          if(check_safeexchange)
+-            for(int i = 0; i < PAD * atom.nlocal; i++) xold[i] = x[i];
++          if (check_safeexchange)
++            for (int ii = 0; ii < PAD * atom.nlocal; ii++)
++              xold[ii] = x[ii];
+         }
+ 
+-        #pragma omp barrier
++#pragma omp barrier
+ 
+         neighbor.build(atom);
+ 
+-        // #pragma omp barrier
+-
+-        #pragma omp master
++#pragma omp master
+         timer.stamp(TIME_NEIGH);
+       }
+ 
+       force->evflag = (n + 1) % thermo.nstat == 0;
+       force->compute(atom, neighbor, comm, comm.me);
+ 
+-      #pragma omp master
++#pragma omp master
+       timer.stamp(TIME_FORCE);
+ 
+-      if(neighbor.halfneigh && neighbor.ghost_newton) {
++      if (neighbor.halfneigh && neighbor.ghost_newton) {
++#pragma omp master
++        {
++          phase_hint_write(PHASE_REVERSE);
++        }
++
+         comm.reverse_communicate(atom);
+ 
+-        #pragma omp master
+-        timer.stamp(TIME_COMM);
++#pragma omp master
++        {
++          phase_hint_write(PHASE_COMPUTE);
++          timer.stamp(TIME_COMM);
++        }
+       }
+ 
+       v = atom.v;
+       f = atom.f;
+       nlocal = atom.nlocal;
+ 
+-      #pragma omp barrier
++#pragma omp barrier
+ 
+       finalIntegrate();
+ 
+-      if(thermo.nstat) thermo.compute(n + 1, atom, neighbor, force, timer, comm);
++      if (thermo.nstat)
++        thermo.compute(n + 1, atom, neighbor, force, timer, comm);
+ 
++      if (ckpt_at_end && (n + 1) == checkpoint_step) {
++#pragma omp master
++        {
++          if (me == 0) {
++            std::printf("\n========================================\n");
++            std::printf("Reached mid-simulation checkpoint at timestep %d (out "
++                        "of %d)\n",
++                        n + 1, ntimes);
++            std::printf("Exiting parallel region for I/O...\n");
++            std::printf("========================================\n");
++          }
++        }
++        break;
++      }
++    }
++  } // end OpenMP parallel (first half)
++
++  // -------------------------------------------------------
++  // MID-SIMULATION SUSTAINED I/O CHECKPOINT
++  // -------------------------------------------------------
++
++  if (ckpt_at_end && checkpoint_step < ntimes) {
++    if (me == 0) {
++      std::printf("\n========================================\n");
++      std::printf("Performing mid-simulation checkpoint with sustained I/O\n");
++      std::printf("========================================\n");
+     }
+-  } //end OpenMP parallel
++
++    phase_hint_write(PHASE_IO);
++
++    write_checkpoint_sustained_io(atom, comm, checkpoint_step, ckpt_dir,
++                                  ckpt_io_duration_sec, ckpt_chunk_bytes,
++                                  ckpt_sleep_us, ckpt_fsync_chunks);
++
++    phase_hint_write(PHASE_COMPUTE);
++
++    if (comm_phase_enabled) {
++      simulate_network_communication(
++          atom, nprocs, comm_standin_bytes, comm_chunk_kb,
++          DEFAULT_COMM_TARGET_DURATION_SEC, DEFAULT_COMM_SLEEP_US);
++    }
++
++    if (me == 0) {
++      std::printf("\n========================================\n");
++      std::printf("Resuming simulation for remaining %d timesteps\n",
++                  ntimes - checkpoint_step);
++      std::printf("========================================\n");
++    }
++
++    phase_hint_write(PHASE_COMPUTE);
++
++// Resume simulation for second half
++#pragma omp parallel private(i, n)
++    {
++      int next_sort = sort_every > 0 ? sort_every : ntimes + 1;
++
++      for (n = checkpoint_step; n < ntimes; n++) {
++
++#pragma omp barrier
++
++        x = atom.x;
++        v = atom.v;
++        f = atom.f;
++        xold = atom.xold;
++        nlocal = atom.nlocal;
++
++        initialIntegrate();
++
++#pragma omp master
++        {
++          phase_hint_write(PHASE_COMPUTE);
++          timer.stamp();
++        }
++
++        if ((n + 1) % neighbor.every) {
++
++#pragma omp master
++          {
++            phase_hint_write(PHASE_COMMUNICATE);
++          }
++
++          comm.communicate(atom);
++
++#pragma omp master
++          {
++            phase_hint_write(PHASE_COMPUTE);
++            timer.stamp(TIME_COMM);
++          }
++
++        } else {
++          {
++            if (check_safeexchange) {
++#pragma omp master
++              {
++                double d_max = 0;
++
++                for (i = 0; i < atom.nlocal; i++) {
++                  double dx = (x[i * PAD + 0] - xold[i * PAD + 0]);
++
++                  if (dx > atom.box.xprd)
++                    dx -= atom.box.xprd;
++
++                  if (dx < -atom.box.xprd)
++                    dx += atom.box.xprd;
++
++                  double dy = (x[i * PAD + 1] - xold[i * PAD + 1]);
++
++                  if (dy > atom.box.yprd)
++                    dy -= atom.box.yprd;
++
++                  if (dy < -atom.box.yprd)
++                    dy += atom.box.yprd;
++
++                  double dz = (x[i * PAD + 2] - xold[i * PAD + 2]);
++
++                  if (dz > atom.box.zprd)
++                    dz -= atom.box.zprd;
++
++                  if (dz < -atom.box.zprd)
++                    dz += atom.box.zprd;
++
++                  double d = dx * dx + dy * dy + dz * dz;
++
++                  if (d > d_max)
++                    d_max = d;
++                }
++
++                d_max = sqrt(d_max);
++
++                if ((d_max > atom.box.xhi - atom.box.xlo) ||
++                    (d_max > atom.box.yhi - atom.box.ylo) ||
++                    (d_max > atom.box.zhi - atom.box.zlo))
++                  printf("Warning: Atoms move further than your subdomain "
++                         "size, which will eventually cause lost atoms.\n"
++                         "Increase reneighboring frequency or choose a "
++                         "different processor grid\n"
++                         "Maximum move distance: %lf; Subdomain dimensions: "
++                         "%lf %lf %lf\n",
++                         d_max, atom.box.xhi - atom.box.xlo,
++                         atom.box.yhi - atom.box.ylo,
++                         atom.box.zhi - atom.box.zlo);
++              }
++            }
++
++#pragma omp master
++            {
++              phase_hint_write(PHASE_EXCHANGE);
++              timer.stamp_extra_start();
++            }
++
++            comm.exchange(atom);
++
++            if (n + 1 >= next_sort) {
++              atom.sort(neighbor);
++              next_sort += sort_every;
++            }
++
++#pragma omp master
++            {
++              phase_hint_write(PHASE_BORDERS);
++            }
++
++            comm.borders(atom);
++
++#pragma omp master
++            {
++              phase_hint_write(PHASE_COMPUTE);
++              timer.stamp_extra_stop(TIME_TEST);
++              timer.stamp(TIME_COMM);
++            }
++
++            if (check_safeexchange)
++              for (int ii = 0; ii < PAD * atom.nlocal; ii++)
++                xold[ii] = x[ii];
++          }
++
++#pragma omp barrier
++
++          neighbor.build(atom);
++
++#pragma omp master
++          timer.stamp(TIME_NEIGH);
++        }
++
++        force->evflag = (n + 1) % thermo.nstat == 0;
++        force->compute(atom, neighbor, comm, comm.me);
++
++#pragma omp master
++        timer.stamp(TIME_FORCE);
++
++        if (neighbor.halfneigh && neighbor.ghost_newton) {
++#pragma omp master
++          {
++            phase_hint_write(PHASE_REVERSE);
++          }
++
++          comm.reverse_communicate(atom);
++
++#pragma omp master
++          {
++            phase_hint_write(PHASE_COMPUTE);
++            timer.stamp(TIME_COMM);
++          }
++        }
++
++        v = atom.v;
++        f = atom.f;
++        nlocal = atom.nlocal;
++
++#pragma omp barrier
++
++        finalIntegrate();
++
++        if (thermo.nstat)
++          thermo.compute(n + 1, atom, neighbor, force, timer, comm);
++      }
++    } // end OpenMP parallel (second half)
++  }
++
++  phase_hint_fini(me);
+ }
+diff --git a/ref/integrate.h b/ref/integrate.h
+index bb22f94..e2470a3 100644
+--- a/ref/integrate.h
++++ b/ref/integrate.h
+@@ -1,60 +1,49 @@
+-/* ----------------------------------------------------------------------
+-   miniMD is a simple, parallel molecular dynamics (MD) code.   miniMD is
+-   an MD microapplication in the Mantevo project at Sandia National
+-   Laboratories ( http://www.mantevo.org ). The primary
+-   authors of miniMD are Steve Plimpton (sjplimp@sandia.gov) , Paul Crozier
+-   (pscrozi@sandia.gov) and Christian Trott (crtrott@sandia.gov).
+-
+-   Copyright (2008) Sandia Corporation.  Under the terms of Contract
+-   DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
+-   certain rights in this software.  This library is free software; you
+-   can redistribute it and/or modify it under the terms of the GNU Lesser
+-   General Public License as published by the Free Software Foundation;
+-   either version 3 of the License, or (at your option) any later
+-   version.
+-
+-   This library is distributed in the hope that it will be useful, but
+-   WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with this software; if not, write to the Free Software
+-   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
+-   USA.  See also: http://www.gnu.org/licenses/lgpl.txt .
+-
+-   For questions, contact Paul S. Crozier (pscrozi@sandia.gov) or
+-   Christian Trott (crtrott@sandia.gov).
+-
+-   Please read the accompanying README and LICENSE files.
+----------------------------------------------------------------------- */
+ 
+ #include "atom.h"
++#include "comm.h"
+ #include "force.h"
+ #include "neighbor.h"
+-#include "comm.h"
+ #include "thermo.h"
+-#include "timer.h"
+ #include "threadData.h"
++#include "timer.h"
++
+ 
+-class Integrate
+-{
+-  public:
+-    MMD_float dt;
+-    MMD_float dtforce;
+-    MMD_int ntimes;
+-    MMD_int nlocal, nmax;
+-    MMD_float* x, *v, *f, *xold;
+-    MMD_float mass;
+-
+-    MMD_int sort_every;
+-
+-    Integrate();
+-    ~Integrate();
+-    void setup();
+-    void initialIntegrate();
+-    void finalIntegrate();
+-    void run(Atom &, Force*, Neighbor &, Comm &, Thermo &, Timer &);
+-
+-    ThreadData* threads;
++#include <cstddef>
++
++class Integrate {
++public:
++  MMD_float dt;
++  MMD_float dtforce;
++  MMD_int ntimes;
++  MMD_int nlocal, nmax;
++  MMD_float *x, *v, *f, *xold;
++  MMD_float mass;
++
++  MMD_int sort_every;
++
++  // Checkpoint configuration
++  MMD_int ckpt_interval; // DEPRECATED - kept for compatibility
++  const char *ckpt_dir;  // Output directory for checkpoint files
++  MMD_int ckpt_at_end;   // Perform checkpoint at end of simulation (default: 1)
++
++  // Sustained I/O parameters (for monitoring I/O effects)
++  double ckpt_io_duration_sec; // Target I/O duration in seconds (default: 30.0)
++  size_t ckpt_chunk_bytes;     // Bytes per chunk write (default: 1 MB)
++  int ckpt_sleep_us; // Sleep between chunks in microseconds (default: 100ms)
++  int ckpt_fsync_chunks; // Whether to fsync after each chunk (default: 0)
++
++  // Communication phase parameters (Johnnie)
++  int comm_phase_enabled;    // Enable network communication phase (default: 1)
++  size_t comm_standin_bytes; // Stand-in total bytes if runtime calc not
++                             // available (default: 309 MB)
++  int comm_chunk_kb; // Chunk size for MPI_Send/Recv in KB (default: 1024 = 1MB)
++
++  Integrate();
++  ~Integrate();
++  void setup();
++  void initialIntegrate();
++  void finalIntegrate();
++  void run(Atom &, Force *, Neighbor &, Comm &, Thermo &, Timer &);
++
++  ThreadData *threads;
+ };
+diff --git a/ref/ljs.cpp b/ref/ljs.cpp
+index 1d5a61a..3d97a37 100644
+--- a/ref/ljs.cpp
++++ b/ref/ljs.cpp
+@@ -1,91 +1,81 @@
+-/* ----------------------------------------------------------------------
+-   miniMD is a simple, parallel molecular dynamics (MD) code.   miniMD is
+-   an MD microapplication in the Mantevo project at Sandia National
+-   Laboratories ( http://www.mantevo.org ). The primary
+-   authors of miniMD are Steve Plimpton (sjplimp@sandia.gov), Paul Crozier
+-   (pscrozi@sandia.gov) and Christian Trott (crtrott@sandia.gov).
+-
+-   Copyright (2008) Sandia Corporation.  Under the terms of Contract
+-   DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government retains
+-   certain rights in this software.  This library is free software; you
+-   can redistribute it and/or modify it under the terms of the GNU Lesser
+-   General Public License as published by the Free Software Foundation;
+-   either version 3 of the License, or (at your option) any later
+-   version.
+-
+-   This code is distributed in the hope that it will be useful, but
+-   WITHOUT ANY WARRANTY; without even the implied warranty of
+-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-   Lesser General Public License for more details.
+-
+-   You should have received a copy of the GNU Lesser General Public
+-   License along with this software; if not, write to the Free Software
+-   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
+-   USA.  See also: http://www.gnu.org/licenses/lgpl.txt .
+-
+-   For questions, contact Paul S. Crozier (pscrozi@sandia.gov) or
+-   Christian Trott (crtrott@sandia.gov).
+-
+-   Please read the accompanying README and LICENSE files.
+----------------------------------------------------------------------- */
+-
++#include "mpi.h"
+ #include "stdio.h"
+ #include "stdlib.h"
+-#include "mpi.h"
+ 
+-#include "variant.h"
+-#include "ljs.h"
++
+ #include "atom.h"
+-#include "neighbor.h"
+-#include "integrate.h"
+-#include "thermo.h"
+ #include "comm.h"
+-#include "timer.h"
+-#include "threadData.h"
+-#include "string.h"
+-#include "openmp.h"
+-#include "force_eam.h"
+ #include "force.h"
++#include "force_eam.h"
+ #include "force_lj.h"
++#include "integrate.h"
++#include "ljs.h"
++#include "neighbor.h"
++#include "openmp.h"
++#include "string.h"
++#include "thermo.h"
++#include "threadData.h"
++#include "timer.h"
++#include "variant.h"
++
+ 
+ #define MAXLINE 256
+ 
+-int input(In &, const char*);
++int input(In &, const char *);
+ void create_box(Atom &, int, int, int, double);
+ int create_atoms(Atom &, int, int, int, double);
+ void create_velocity(double, Atom &, Thermo &);
+-void output(In &, Atom &, Force*, Neighbor &, Comm &,
+-            Thermo &, Integrate &, Timer &, int);
+-int read_lammps_data(Atom &atom, Comm &comm, Neighbor &neighbor, Integrate &integrate, Thermo &thermo, char* file, int units);
++void output(In &, Atom &, Force *, Neighbor &, Comm &, Thermo &, Integrate &,
++            Timer &, int);
++int read_lammps_data(Atom &atom, Comm &comm, Neighbor &neighbor,
++                     Integrate &integrate, Thermo &thermo, char *file,
++                     int units);
+ 
+-int main(int argc, char** argv)
+-{
++int main(int argc, char **argv) {
+   In in;
+   in.datafile = NULL;
+-  int me = 0;                   //local MPI rank
+-  int nprocs = 1;               //number of MPI ranks
+-  int num_threads = 1;		//number of OpenMP threads
+-  int num_steps = -1;           //number of timesteps (if -1 use value from lj.in)
+-  int system_size = -1;         //size of the system (if -1 use value from lj.in)
++  int me = 0;           // local MPI rank
++  int nprocs = 1;       // number of MPI ranks
++  int num_threads = 1;  // number of OpenMP threads
++  int num_steps = -1;   // number of timesteps (if -1 use value from lj.in)
++  int system_size = -1; // size of the system (if -1 use value from lj.in)
+   int nx = -1;
+   int ny = -1;
+   int nz = -1;
+-  int check_safeexchange = 0;   //if 1 complain if atom moves further than 1 subdomain length between exchanges
+-  int do_safeexchange = 0;      //if 1 use safe exchange mode [allows exchange over multiple subdomains]
+-  int use_sse = 0;              //setting for SSE variant of miniMD only
+-  int screen_yaml = 0;          //print yaml output to screen also
+-  int yaml_output = 0;          //print yaml output
+-  int halfneigh = 1;            //1: use half neighborlist; 0: use full neighborlist; -1: use original miniMD version half neighborlist force
++  int check_safeexchange = 0; // if 1 complain if atom moves further than 1
++                              // subdomain length between exchanges
++  int do_safeexchange = 0; // if 1 use safe exchange mode [allows exchange over
++                           // multiple subdomains]
++  int use_sse = 0;     // setting for SSE variant of miniMD only
++  int yaml_output = 0; // print yaml output
++  int screen_yaml = 0; // print yaml output to screen also
++  int halfneigh = 1; // 1: use half neighborlist; 0: use full neighborlist; -1:
++                     // use original miniMD version half neighborlist force
+   int teams = 1;
+   int device = 0;
+   int neighbor_size = -1;
+-  char* input_file = NULL;
++  char *input_file = NULL;
+   int ghost_newton = 1;
+   int sort = -1;
+   int ntypes = 4;
+ 
+-  for(int i = 0; i < argc; i++) {
+-    if((strcmp(argv[i], "-i") == 0) || (strcmp(argv[i], "--input_file") == 0)) {
++  int ckpt_interval = 0;        // DEPRECATED - kept for compatibility
++  const char *ckpt_dir = "chk"; // default output directory
++
++  // Sustained I/O parameters (Gia's I/O phase)
++  double ckpt_io_duration_sec = 30.0; // Default 30 seconds
++  int ckpt_chunk_mb = 1;              // Default 1 MB chunks
++  int ckpt_sleep_ms = 100;            // Default 100 ms sleep
++  int ckpt_fsync_chunks = 0;          // Default: don't fsync each chunk
++
++  // Communication phase parameters (Johnnie)
++  int comm_phase_enabled = 1; // Enabled by default
++  int comm_standin_mb = 309;  // 309 MB stand-in
++  int comm_chunk_kb = 1024;   // 1 MB chunks for MPI send/recv
++
++  for (int i = 0; i < argc; i++) {
++    if ((strcmp(argv[i], "-i") == 0) ||
++        (strcmp(argv[i], "--input_file") == 0)) {
+       input_file = argv[++i];
+       continue;
+     }
+@@ -97,162 +87,272 @@ int main(int argc, char** argv)
+ 
+   int error = 0;
+ 
+-  if(input_file == NULL)
++  if (input_file == NULL)
+     error = input(in, "in.lj.miniMD");
+   else
+     error = input(in, input_file);
+ 
+-  if(error) {
++  if (error) {
+     MPI_Finalize();
+     exit(0);
+   }
+ 
+   srand(5413);
+ 
+-  for(int i = 0; i < argc; i++) {
+-    if((strcmp(argv[i], "-t") == 0) || (strcmp(argv[i], "--num_threads") == 0)) {
++  for (int i = 0; i < argc; i++) {
++    if ((strcmp(argv[i], "-t") == 0) ||
++        (strcmp(argv[i], "--num_threads") == 0)) {
+       num_threads = atoi(argv[++i]);
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "--teams") == 0)) {
++    if ((strcmp(argv[i], "--teams") == 0)) {
+       teams = atoi(argv[++i]);
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "-n") == 0) || (strcmp(argv[i], "--nsteps") == 0))  {
++    if ((strcmp(argv[i], "-n") == 0) || (strcmp(argv[i], "--nsteps") == 0)) {
+       num_steps = atoi(argv[++i]);
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "-s") == 0) || (strcmp(argv[i], "--size") == 0)) {
++    if ((strcmp(argv[i], "-s") == 0) || (strcmp(argv[i], "--size") == 0)) {
+       system_size = atoi(argv[++i]);
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "-nx") == 0)) {
++    if ((strcmp(argv[i], "-nx") == 0)) {
+       nx = atoi(argv[++i]);
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "-ny") == 0)) {
++    if ((strcmp(argv[i], "-ny") == 0)) {
+       ny = atoi(argv[++i]);
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "-nz") == 0)) {
++    if ((strcmp(argv[i], "-nz") == 0)) {
+       nz = atoi(argv[++i]);
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "--ntypes") == 0)) {
++    if ((strcmp(argv[i], "--ntypes") == 0)) {
+       ntypes = atoi(argv[++i]);
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "-b") == 0) || (strcmp(argv[i], "--neigh_bins") == 0))  {
++    if ((strcmp(argv[i], "-b") == 0) ||
++        (strcmp(argv[i], "--neigh_bins") == 0)) {
+       neighbor_size = atoi(argv[++i]);
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "--half_neigh") == 0))  {
++    if ((strcmp(argv[i], "--half_neigh") == 0)) {
+       halfneigh = atoi(argv[++i]);
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "-sse") == 0))  {
++    if ((strcmp(argv[i], "-sse") == 0)) {
+       use_sse = atoi(argv[++i]);
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "--check_exchange") == 0))  {
++    if ((strcmp(argv[i], "--check_exchange") == 0)) {
+       check_safeexchange = 1;
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "--sort") == 0))  {
++    if ((strcmp(argv[i], "--sort") == 0)) {
+       sort = atoi(argv[++i]);
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "-o") == 0) || (strcmp(argv[i], "--yaml_output") == 0))  {
++    if ((strcmp(argv[i], "-o") == 0) ||
++        (strcmp(argv[i], "--yaml_output") == 0)) {
+       yaml_output = atoi(argv[++i]);
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "--yaml_screen") == 0))  {
++    if ((strcmp(argv[i], "--yaml_screen") == 0)) {
+       screen_yaml = 1;
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "-f") == 0) || (strcmp(argv[i], "--data_file") == 0)) {
+-      if(in.datafile == NULL) in.datafile = new char[1000];
++    if ((strcmp(argv[i], "-f") == 0) || (strcmp(argv[i], "--data_file") == 0)) {
++      if (in.datafile == NULL)
++        in.datafile = new char[1000];
+ 
+       strcpy(in.datafile, argv[++i]);
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "-u") == 0) || (strcmp(argv[i], "--units") == 0)) {
++    if ((strcmp(argv[i], "-u") == 0) || (strcmp(argv[i], "--units") == 0)) {
+       in.units = strcmp(argv[++i], "metal") == 0 ? 1 : 0;
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "-p") == 0) || (strcmp(argv[i], "--force") == 0)) {
++    if ((strcmp(argv[i], "-p") == 0) || (strcmp(argv[i], "--force") == 0)) {
+       in.forcetype = strcmp(argv[++i], "eam") == 0 ? FORCEEAM : FORCELJ;
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "-gn") == 0) || (strcmp(argv[i], "--ghost_newton") == 0)) {
++    if ((strcmp(argv[i], "-gn") == 0) ||
++        (strcmp(argv[i], "--ghost_newton") == 0)) {
+       ghost_newton = atoi(argv[++i]);
+       continue;
+     }
+ 
+-    if((strcmp(argv[i], "-h") == 0) || (strcmp(argv[i], "--help") == 0)) {
+-      printf("\n-----------------------------------------------------------------------------------------------------------\n");
++    if ((strcmp(argv[i], "--ckpt") == 0)) {
++      ckpt_interval = atoi(argv[++i]);
++      continue;
++    }
++    if ((strcmp(argv[i], "--ckpt_dir") == 0)) {
++      ckpt_dir = argv[++i];
++      continue;
++    }
++
++    // Sustained I/O CLI flags (Gia)
++    if ((strcmp(argv[i], "--ckpt_io_duration") == 0)) {
++      ckpt_io_duration_sec = atof(argv[++i]);
++      continue;
++    }
++    if ((strcmp(argv[i], "--ckpt_chunk_mb") == 0)) {
++      ckpt_chunk_mb = atoi(argv[++i]);
++      continue;
++    }
++    if ((strcmp(argv[i], "--ckpt_sleep_ms") == 0)) {
++      ckpt_sleep_ms = atoi(argv[++i]);
++      continue;
++    }
++    if ((strcmp(argv[i], "--ckpt_fsync") == 0)) {
++      ckpt_fsync_chunks = atoi(argv[++i]);
++      continue;
++    }
++
++    // Communication phase CLI flags (Johnnie)
++    if ((strcmp(argv[i], "--comm_phase") == 0)) {
++      comm_phase_enabled = atoi(argv[++i]);
++      continue;
++    }
++    if ((strcmp(argv[i], "--comm_standin_mb") == 0)) {
++      comm_standin_mb = atoi(argv[++i]);
++      continue;
++    }
++    if ((strcmp(argv[i], "--comm_chunk_kb") == 0)) {
++      comm_chunk_kb = atoi(argv[++i]);
++      continue;
++    }
++
++    if ((strcmp(argv[i], "-h") == 0) || (strcmp(argv[i], "--help") == 0)) {
++      printf("\n---------------------------------------------------------------"
++             "--------------------------------------------\n");
+       printf("-------------" VARIANT_STRING "--------------------\n");
+-      printf("-------------------------------------------------------------------------------------------------------------\n\n");
++      printf("-----------------------------------------------------------------"
++             "--------------------------------------------\n\n");
+ 
+       printf("miniMD is a simple, parallel molecular dynamics (MD) code,\n"
+              "which is part of the Mantevo project at Sandia National\n"
+              "Laboratories ( http://www.mantevo.org ).\n"
+-             "The original authors of miniMD are Steve Plimpton (sjplimp@sandia.gov) ,\n"
++             "The original authors of miniMD are Steve Plimpton "
++             "(sjplimp@sandia.gov) ,\n"
+              "Paul Crozier (pscrozi@sandia.gov) with current\n"
+              "versions written by Christian Trott (crtrott@sandia.gov).\n\n");
+       printf("Commandline Options:\n");
+       printf("\n  Execution configuration:\n");
+-      printf("\t--teams <nteams>:             set number of thread-teams used per MPI rank (default 1)\n");
+-      printf("\t-t / --num_threads <threads>: set number of threads per thread-team (default 1)\n");
+-      printf("\t--half_neigh <int>:           use half neighborlists (default 1)\n"
+-             "\t                                0: full neighborlist\n"
+-             "\t                                1: half neighborlist\n"
+-             "\t                               -1: original miniMD half neighborlist force (not OpenMP safe)\n");
+-      printf("\t-d / --device <int>:          choose device to use (only applicable for GPU execution)\n");
++      printf("\t--teams <nteams>:             set number of thread-teams used "
++             "per MPI rank (default 1)\n");
++      printf("\t-t / --num_threads <threads>: set number of threads per "
++             "thread-team (default 1)\n");
++      printf(
++          "\t--half_neigh <int>:           use half neighborlists (default 1)\n"
++          "\t                                0: full neighborlist\n"
++          "\t                                1: half neighborlist\n"
++          "\t                               -1: original miniMD half "
++          "neighborlist force (not OpenMP safe)\n");
++      printf("\t-d / --device <int>:          choose device to use (only "
++             "applicable for GPU execution)\n");
+       printf("\t-dm / --device_map:           map devices to MPI ranks\n");
+-      printf("\t-ng / --num_gpus <int>:       give number of GPUs per Node (used in conjuction with -dm\n"
+-             "\t                              to determine device id: 'id=mpi_rank%%ng' (default 2)\n");
+-      printf("\t--skip_gpu <int>:             skip the specified gpu when assigning devices to MPI ranks\n"
+-             "\t                              used in conjunction with -dm (but must come first in arg list)\n");
+-      printf("\t-sse <sse_version>:           use explicit sse intrinsics (use miniMD-SSE variant)\n");
+-      printf("\t-gn / --ghost_newton <int>:   set usage of newtons third law for ghost atoms\n"
+-             "\t                                (only applicable with half neighborlists)\n");
++      printf("\t-ng / --num_gpus <int>:       give number of GPUs per Node "
++             "(used in conjuction with -dm\n"
++             "\t                              to determine device id: "
++             "'id=mpi_rank%%ng' (default 2)\n");
++      printf("\t--skip_gpu <int>:             skip the specified gpu when "
++             "assigning devices to MPI ranks\n"
++             "\t                              used in conjunction with -dm "
++             "(but must come first in arg list)\n");
++      printf("\t-sse <sse_version>:           use explicit sse intrinsics (use "
++             "miniMD-SSE variant)\n");
++      printf("\t-gn / --ghost_newton <int>:   set usage of newtons third law "
++             "for ghost atoms\n"
++             "\t                                (only applicable with half "
++             "neighborlists)\n");
+       printf("\n  Simulation setup:\n");
+-      printf("\t-i / --input_file <string>:   set input file to be used (default: in.lj.miniMD)\n");
+-      printf("\t--ntypes <int>:               set number of atom types for simulation (default: 4)\n");
+-      printf("\t-n / --nsteps <int>:          set number of timesteps for simulation\n");
+-      printf("\t-s / --size <int>:            set linear dimension of systembox\n");
+-      printf("\t-nx/-ny/-nz <int>:            set linear dimension of systembox in x/y/z direction\n");
+-      printf("\t-b / --neigh_bins <int>:      set linear dimension of neighbor bin grid\n");
+-      printf("\t-u / --units <string>:        set units (lj or metal), see LAMMPS documentation\n");
+-      printf("\t-p / --force <string>:        set interaction model (lj or eam)\n");
+-      printf("\t-f / --data_file <string>:    read configuration from LAMMPS data file\n");
++      printf("\t-i / --input_file <string>:   set input file to be used "
++             "(default: in.lj.miniMD)\n");
++      printf("\t--ntypes <int>:               set number of atom types for "
++             "simulation (default: 4)\n");
++      printf("\t-n / --nsteps <int>:          set number of timesteps for "
++             "simulation\n");
++      printf("\t-s / --size <int>:            set linear dimension of "
++             "systembox\n");
++      printf("\t-nx/-ny/-nz <int>:            set linear dimension of "
++             "systembox in x/y/z direction\n");
++      printf("\t-b / --neigh_bins <int>:      set linear dimension of neighbor "
++             "bin grid\n");
++      printf("\t-u / --units <string>:        set units (lj or metal), see "
++             "LAMMPS documentation\n");
++      printf("\t-p / --force <string>:        set interaction model (lj or "
++             "eam)\n");
++      printf("\t-f / --data_file <string>:    read configuration from LAMMPS "
++             "data file\n");
+ 
+       printf("\n  Miscelaneous:\n");
+-      printf("\t--check_exchange:             check whether atoms moved further than subdomain width\n");
+-      printf("\t--safe_exchange:              perform exchange communication with all MPI processes\n"
+-             "\t                                within rcut_neighbor (outer force cutoff)\n");
+-      printf("\t--sort <n>:                   resort atoms (simple bins) every <n> steps (default: use reneigh frequency; never=0)");
+-      printf("\t-o / --yaml_output <int>:     level of yaml output (default 1)\n");
+-      printf("\t--yaml_screen:                write yaml output also to screen\n");
++      printf("\t--check_exchange:             check whether atoms moved "
++             "further than subdomain width\n");
++      printf("\t--safe_exchange:              perform exchange communication "
++             "with all MPI processes\n"
++             "\t                                within rcut_neighbor (outer "
++             "force cutoff)\n");
++      printf("\t--sort <n>:                   resort atoms (simple bins) every "
++             "<n> steps (default: use reneigh frequency; never=0)");
++      printf(
++          "\t-o / --yaml_output <int>:     level of yaml output (default 1)\n");
++      printf(
++          "\t--yaml_screen:                write yaml output also to screen\n");
++
++      printf("\n  Sustained I/O Checkpointing (for monitoring):\n");
++      printf("\t--ckpt_dir <DIR>:             checkpoint directory (default: "
++             "chk)\n");
++      printf("\t--ckpt_io_duration <SEC>:     I/O duration in seconds "
++             "(default: 30)\n");
++      printf("\t--ckpt_chunk_mb <MB>:         chunk size in MB (default: 1)\n");
++      printf("\t--ckpt_sleep_ms <MS>:         sleep between chunks in ms "
++             "(default: 100)\n");
++      printf("\t--ckpt_fsync <0|1>:           fsync after each chunk (default: "
++             "0)\n");
++
++      printf("\n  Communication Phase (Johnnie):\n");
++      printf("\t--comm_phase <0|1>:           enable/disable comm phase "
++             "(default: 1)\n");
++      printf("\t--comm_standin_mb <MB>:       stand-in total data in MB "
++             "(default: 309)\n");
++      printf("\t--comm_chunk_kb <KB>:         MPI send/recv chunk size in KB "
++             "(default: 1024)\n");
++
++      printf("\n  Examples:\n");
++      printf("\t# 30 seconds of I/O with 1MB chunks, 100ms sleep:\n");
++      printf("\t  mpirun -np 4 ./miniMD --ckpt_io_duration 30\n\n");
++      printf("\t# 60 seconds of I/O with 2MB chunks, 50ms sleep:\n");
++      printf("\t  mpirun -np 4 ./miniMD --ckpt_io_duration 60 --ckpt_chunk_mb "
++             "2 --ckpt_sleep_ms 50\n\n");
++      printf("\t# Fast I/O (10 seconds, 5MB chunks, no sleep):\n");
++      printf("\t  mpirun -np 4 ./miniMD --ckpt_io_duration 10 --ckpt_chunk_mb "
++             "5 --ckpt_sleep_ms 0\n\n");
++      printf("\t# Communication phase with 500MB stand-in:\n");
++      printf("\t  mpirun -np 32 ./miniMD --comm_standin_mb 500\n\n");
++      printf("\t# Disable communication phase:\n");
++      printf("\t  mpirun -np 32 ./miniMD --comm_phase 0\n\n");
++
+       printf("\t-h / --help:                  display this help message\n\n");
+       printf("---------------------------------------------------------\n\n");
+ 
+@@ -260,7 +360,6 @@ int main(int argc, char** argv)
+     }
+   }
+ 
+-
+   Atom atom(ntypes);
+   Neighbor neighbor(ntypes);
+   Integrate integrate;
+@@ -269,20 +368,22 @@ int main(int argc, char** argv)
+   Timer timer;
+   ThreadData threads;
+ 
+-  Force* force;
++  Force *force;
+ 
+-  if(in.forcetype == FORCEEAM) {
+-    force = (Force*) new ForceEAM(ntypes);
++  if (in.forcetype == FORCEEAM) {
++    force = (Force *)new ForceEAM(ntypes);
+ 
+-    if(ghost_newton == 1) {
+-      if(me == 0)
+-        printf("# EAM currently requires '--ghost_newton 0'; Changing setting now.\n");
++    if (ghost_newton == 1) {
++      if (me == 0)
++        printf("# EAM currently requires '--ghost_newton 0'; Changing setting "
++               "now.\n");
+ 
+       ghost_newton = 0;
+     }
+   }
+ 
+-  if(in.forcetype == FORCELJ) force = (Force*) new ForceLJ(ntypes);
++  if (in.forcetype == FORCELJ)
++    force = (Force *)new ForceLJ(ntypes);
+ 
+   threads.mpi_me = me;
+   threads.mpi_num_threads = nprocs;
+@@ -296,11 +397,12 @@ int main(int argc, char** argv)
+   neighbor.threads = &threads;
+   thermo.threads = &threads;
+ 
+-  if(in.forcetype == FORCELJ) {
+-    for(int i=0; i<ntypes*ntypes; i++) {
++  if (in.forcetype == FORCELJ) {
++    for (int i = 0; i < ntypes * ntypes; i++) {
+       force->epsilon[i] = in.epsilon;
+       force->sigma[i] = in.sigma;
+-      force->sigma6[i] = in.sigma*in.sigma*in.sigma*in.sigma*in.sigma*in.sigma;
++      force->sigma6[i] =
++          in.sigma * in.sigma * in.sigma * in.sigma * in.sigma * in.sigma;
+     }
+   }
+ 
+@@ -315,80 +417,103 @@ int main(int argc, char** argv)
+   force->use_sse = use_sse;
+   neighbor.halfneigh = halfneigh;
+ 
+-  if(halfneigh < 0) force->use_oldcompute = 1;
++  if (halfneigh < 0)
++    force->use_oldcompute = 1;
+ 
+-  if(use_sse) {
++  if (use_sse) {
+ #ifdef VARIANT_REFERENCE
+ 
+-    if(me == 0) printf("ERROR: Trying to run with -sse with miniMD reference version. Use SSE variant instead. Exiting.\n");
++    if (me == 0)
++      printf("ERROR: Trying to run with -sse with miniMD reference version. "
++             "Use SSE variant instead. Exiting.\n");
+ 
+     MPI_Finalize();
+     exit(0);
+ #endif
+   }
+ 
+-  if(num_steps > 0) in.ntimes = num_steps;
++  if (num_steps > 0)
++    in.ntimes = num_steps;
+ 
+-  if(system_size > 0) {
++  if (system_size > 0) {
+     in.nx = system_size;
+     in.ny = system_size;
+     in.nz = system_size;
+   }
+ 
+-  if(nx > 0) {
++  if (nx > 0) {
+     in.nx = nx;
+-    if(ny > 0)
++    if (ny > 0)
+       in.ny = ny;
+-    else if(system_size < 0)
++    else if (system_size < 0)
+       in.ny = nx;
+ 
+-    if(nz > 0)
++    if (nz > 0)
+       in.nz = nz;
+-    else if(system_size < 0)
++    else if (system_size < 0)
+       in.nz = nx;
+   }
+ 
+-  if(neighbor_size > 0) {
++  if (neighbor_size > 0) {
+     neighbor.nbinx = neighbor_size;
+     neighbor.nbiny = neighbor_size;
+     neighbor.nbinz = neighbor_size;
+   }
+ 
+-  if(neighbor_size < 0 && in.datafile == NULL) {
++  if (neighbor_size < 0 && in.datafile == NULL) {
+     MMD_float neighscale = 5.0 / 6.0;
+     neighbor.nbinx = neighscale * in.nx;
+     neighbor.nbiny = neighscale * in.ny;
+     neighbor.nbinz = neighscale * in.nz;
+   }
+ 
+-  if(neighbor_size < 0 && in.datafile)
++  if (neighbor_size < 0 && in.datafile)
+     neighbor.nbinx = -1;
+ 
+-  if(neighbor.nbinx == 0) neighbor.nbinx = 1;
++  if (neighbor.nbinx == 0)
++    neighbor.nbinx = 1;
+ 
+-  if(neighbor.nbiny == 0) neighbor.nbiny = 1;
++  if (neighbor.nbiny == 0)
++    neighbor.nbiny = 1;
+ 
+-  if(neighbor.nbinz == 0) neighbor.nbinz = 1;
++  if (neighbor.nbinz == 0)
++    neighbor.nbinz = 1;
+ 
+   integrate.ntimes = in.ntimes;
+   integrate.dt = in.dt;
+-  integrate.sort_every = sort>0?sort:(sort<0?in.neigh_every:0);
++  integrate.sort_every = sort > 0 ? sort : (sort < 0 ? in.neigh_every : 0);
++
++  integrate.ckpt_interval = ckpt_interval; // DEPRECATED
++  integrate.ckpt_dir = ckpt_dir;
++
++  // Pass sustained I/O parameters to Integrate (Gia)
++  integrate.ckpt_io_duration_sec = ckpt_io_duration_sec;
++  integrate.ckpt_chunk_bytes = (size_t)ckpt_chunk_mb * 1024 * 1024;
++  integrate.ckpt_sleep_us = ckpt_sleep_ms * 1000;
++  integrate.ckpt_fsync_chunks = ckpt_fsync_chunks;
++
++  // Pass communication phase parameters to Integrate (Johnnie)
++  integrate.comm_phase_enabled = comm_phase_enabled;
++  integrate.comm_standin_bytes = (size_t)comm_standin_mb * 1024 * 1024;
++  integrate.comm_chunk_kb = comm_chunk_kb;
++
+   neighbor.every = in.neigh_every;
+   neighbor.cutneigh = in.neigh_cut;
+   force->cutforce = in.force_cut;
+   thermo.nstat = in.thermo_nstat;
+ 
+-
+-  if(me == 0)
++  if (me == 0)
+     printf("# Create System:\n");
+ 
+-  if(in.datafile) {
+-    read_lammps_data(atom, comm, neighbor, integrate, thermo, in.datafile, in.units);
++  if (in.datafile) {
++    read_lammps_data(atom, comm, neighbor, integrate, thermo, in.datafile,
++                     in.units);
+     MMD_float volume = atom.box.xprd * atom.box.yprd * atom.box.zprd;
+     in.rho = 1.0 * atom.natoms / volume;
+     force->setup();
+ 
+-    if(in.forcetype == FORCEEAM) atom.mass = force->mass;
++    if (in.forcetype == FORCEEAM)
++      atom.mass = force->mass;
+   } else {
+     create_box(atom, in.nx, in.ny, in.nz, in.rho);
+ 
+@@ -400,69 +525,85 @@ int main(int argc, char** argv)
+ 
+     force->setup();
+ 
+-    if(in.forcetype == FORCEEAM) atom.mass = force->mass;
++    if (in.forcetype == FORCEEAM)
++      atom.mass = force->mass;
+ 
+     create_atoms(atom, in.nx, in.ny, in.nz, in.rho);
+     thermo.setup(in.rho, integrate, atom, in.units);
+ 
+     create_velocity(in.t_request, atom, thermo);
+-
+   }
+ 
+-  if(me == 0)
++  if (me == 0)
+     printf("# Done .... \n");
+ 
+-  if(me == 0) {
++  if (me == 0) {
+     fprintf(stdout, "# " VARIANT_STRING " output ...\n");
+     fprintf(stdout, "# Run Settings: \n");
+-    fprintf(stdout, "\t# MPI processes: %i\n", neighbor.threads->mpi_num_threads);
+-    fprintf(stdout, "\t# OpenMP threads: %i\n", neighbor.threads->omp_num_threads);
+-    fprintf(stdout, "\t# Inputfile: %s\n", input_file == 0 ? "in.lj.miniMD" : input_file);
++    fprintf(stdout, "\t# MPI processes: %i\n",
++            neighbor.threads->mpi_num_threads);
++    fprintf(stdout, "\t# OpenMP threads: %i\n",
++            neighbor.threads->omp_num_threads);
++    fprintf(stdout, "\t# Inputfile: %s\n",
++            input_file == 0 ? "in.lj.miniMD" : input_file);
+     fprintf(stdout, "\t# Datafile: %s\n", in.datafile ? in.datafile : "None");
+     fprintf(stdout, "# Physics Settings: \n");
+-    fprintf(stdout, "\t# ForceStyle: %s\n", in.forcetype == FORCELJ ? "LJ" : "EAM");
+-    fprintf(stdout, "\t# Force Parameters: %2.2lf %2.2lf\n",in.epsilon,in.sigma);
++    fprintf(stdout, "\t# ForceStyle: %s\n",
++            in.forcetype == FORCELJ ? "LJ" : "EAM");
++    fprintf(stdout, "\t# Force Parameters: %2.2lf %2.2lf\n", in.epsilon,
++            in.sigma);
+     fprintf(stdout, "\t# Units: %s\n", in.units == 0 ? "LJ" : "METAL");
+     fprintf(stdout, "\t# Atoms: %i\n", atom.natoms);
+     fprintf(stdout, "\t# Atom types: %i\n", atom.ntypes);
+-    fprintf(stdout, "\t# System size: %2.2lf %2.2lf %2.2lf (unit cells: %i %i %i)\n", atom.box.xprd, atom.box.yprd, atom.box.zprd, in.nx, in.ny, in.nz);
++    fprintf(stdout,
++            "\t# System size: %2.2lf %2.2lf %2.2lf (unit cells: %i %i %i)\n",
++            atom.box.xprd, atom.box.yprd, atom.box.zprd, in.nx, in.ny, in.nz);
+     fprintf(stdout, "\t# Density: %lf\n", in.rho);
+     fprintf(stdout, "\t# Force cutoff: %lf\n", force->cutforce);
+     fprintf(stdout, "\t# Timestep size: %lf\n", integrate.dt);
+     fprintf(stdout, "# Technical Settings: \n");
+     fprintf(stdout, "\t# Neigh cutoff: %lf\n", neighbor.cutneigh);
+     fprintf(stdout, "\t# Half neighborlists: %i\n", neighbor.halfneigh);
+-    fprintf(stdout, "\t# Neighbor bins: %i %i %i\n", neighbor.nbinx, neighbor.nbiny, neighbor.nbinz);
++    fprintf(stdout, "\t# Neighbor bins: %i %i %i\n", neighbor.nbinx,
++            neighbor.nbiny, neighbor.nbinz);
+     fprintf(stdout, "\t# Neighbor frequency: %i\n", neighbor.every);
+     fprintf(stdout, "\t# Sorting frequency: %i\n", integrate.sort_every);
+     fprintf(stdout, "\t# Thermo frequency: %i\n", thermo.nstat);
+     fprintf(stdout, "\t# Ghost Newton: %i\n", ghost_newton);
+     fprintf(stdout, "\t# Use intrinsics: %i\n", force->use_sse);
+     fprintf(stdout, "\t# Do safe exchange: %i\n", comm.do_safeexchange);
+-    fprintf(stdout, "\t# Size of float: %i\n\n", (int) sizeof(MMD_float));
++    fprintf(stdout, "\t# Size of float: %i\n", (int)sizeof(MMD_float));
++    // Communication phase info (Johnnie)
++    fprintf(stdout, "# Communication Phase Settings:\n");
++    fprintf(stdout, "\t# Comm phase enabled: %i\n", comm_phase_enabled);
++    fprintf(stdout, "\t# Comm stand-in size: %i MB\n", comm_standin_mb);
++    fprintf(stdout, "\t# Comm chunk size: %i KB\n", comm_chunk_kb);
++    fprintf(stdout, "\n");
+   }
+ 
+   comm.exchange(atom);
+-  if(sort>0)
++  if (sort > 0)
+     atom.sort(neighbor);
+   comm.borders(atom);
+ 
+   force->evflag = 1;
+-  #pragma omp parallel
++#pragma omp parallel
+   {
+     neighbor.build(atom);
+-  
++
+     force->compute(atom, neighbor, comm, me);
+   }
+ 
+-  if(neighbor.halfneigh && neighbor.ghost_newton)
++  if (neighbor.halfneigh && neighbor.ghost_newton)
+     comm.reverse_communicate(atom);
+ 
+-  if(me == 0) printf("# Starting dynamics ...\n");
++  if (me == 0)
++    printf("# Starting dynamics ...\n");
+ 
+-  if(me == 0) printf("# Timestep T U P Time\n");
++  if (me == 0)
++    printf("# Timestep T U P Time\n");
+ 
+-  #pragma omp parallel
++#pragma omp parallel
+   {
+     thermo.compute(0, atom, neighbor, force, timer, comm);
+   }
+@@ -477,29 +618,34 @@ int main(int argc, char** argv)
+   force->evflag = 1;
+   force->compute(atom, neighbor, comm, me);
+ 
+-  if(neighbor.halfneigh && neighbor.ghost_newton)
++  if (neighbor.halfneigh && neighbor.ghost_newton)
+     comm.reverse_communicate(atom);
+ 
+   thermo.compute(-1, atom, neighbor, force, timer, comm);
+ 
+-  if(me == 0) {
+-    double time_other = timer.array[TIME_TOTAL] - timer.array[TIME_FORCE] - timer.array[TIME_NEIGH] - timer.array[TIME_COMM];
++  if (me == 0) {
++    double time_other = timer.array[TIME_TOTAL] - timer.array[TIME_FORCE] -
++                        timer.array[TIME_NEIGH] - timer.array[TIME_COMM];
+     printf("\n\n");
+     printf("# Performance Summary:\n");
+-    printf("# MPI_proc OMP_threads nsteps natoms t_total t_force t_neigh t_comm t_other performance perf/thread grep_string t_extra\n");
++    printf("# MPI_proc OMP_threads nsteps natoms t_total t_force t_neigh "
++           "t_comm t_other performance perf/thread grep_string t_extra\n");
+     printf("%i %i %i %i %lf %lf %lf %lf %lf %lf %lf PERF_SUMMARY %lf\n\n\n",
+            nprocs, num_threads, integrate.ntimes, natoms,
+-           timer.array[TIME_TOTAL], timer.array[TIME_FORCE], timer.array[TIME_NEIGH], timer.array[TIME_COMM], time_other,
+-           1.0 * natoms * integrate.ntimes / timer.array[TIME_TOTAL], 1.0 * natoms * integrate.ntimes / timer.array[TIME_TOTAL] / nprocs / num_threads, timer.array[TIME_TEST]);
+-
++           timer.array[TIME_TOTAL], timer.array[TIME_FORCE],
++           timer.array[TIME_NEIGH], timer.array[TIME_COMM], time_other,
++           1.0 * natoms * integrate.ntimes / timer.array[TIME_TOTAL],
++           1.0 * natoms * integrate.ntimes / timer.array[TIME_TOTAL] / nprocs /
++               num_threads,
++           timer.array[TIME_TEST]);
+   }
+ 
+-  if(yaml_output)
+-    output(in, atom, force, neighbor, comm, thermo, integrate, timer, screen_yaml);
++  if (yaml_output)
++    output(in, atom, force, neighbor, comm, thermo, integrate, timer,
++           screen_yaml);
+ 
+   delete force;
+   MPI_Barrier(MPI_COMM_WORLD);
+   MPI_Finalize();
+   return 0;
+ }
+-

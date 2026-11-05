@@ -1,0 +1,53 @@
+{
+  "empirical_data": {
+    "2": {
+      "comm_pct": 23.7,
+      "compute_pct": 62.5,
+      "force_pct": 62.5,
+      "neigh_pct": 12.6
+    },
+    "4": {
+      "comm_pct": 45.3,
+      "compute_pct": 54.7,
+      "force_pct": 47.5,
+      "neigh_pct": 11.7
+    },
+    "8": {
+      "comm_pct": 75.9,
+      "compute_pct": 24.1,
+      "force_pct": 14.9,
+      "neigh_pct": 9.3
+    },
+    "16": {
+      "comm_pct": 87.5,
+      "compute_pct": 12.5,
+      "force_pct": 4.6,
+      "neigh_pct": 7.7
+    },
+    "32": {
+      "comm_pct": 97.6,
+      "compute_pct": 2.4,
+      "force_pct": 1.9,
+      "neigh_pct": 0.3
+    },
+    "64": {
+      "comm_pct": 97.8,
+      "compute_pct": 2.2,
+      "force_pct": 0.8,
+      "neigh_pct": 0.2
+    }
+  },
+  "current_run": {
+    "command_line_expected_ranks": 32,
+    "detected_ranks": 4,
+    "used_empirical_comm_pct": 45.3,
+    "used_empirical_compute_pct": 54.7
+  },
+  "phase_stats": {
+    "IDLE": {
+      "time": 16.799086809158325,
+      "samples": 1,
+      "transitions": 0
+    }
+  }
+}

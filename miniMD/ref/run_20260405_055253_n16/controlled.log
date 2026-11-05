@@ -1,0 +1,119 @@
+[frnt115.frontenac.local:3547525] MCW rank 15 bound to socket 0[core 15[hwt 0]]: [./././././././././././././././B/./././././././././././././././.]
+[frnt115.frontenac.local:3547525] MCW rank 0 bound to socket 0[core 0[hwt 0]]: [B/././././././././././././././././././././././././././././././.]
+[frnt115.frontenac.local:3547525] MCW rank 1 bound to socket 0[core 1[hwt 0]]: [./B/./././././././././././././././././././././././././././././.]
+[frnt115.frontenac.local:3547525] MCW rank 2 bound to socket 0[core 2[hwt 0]]: [././B/././././././././././././././././././././././././././././.]
+[frnt115.frontenac.local:3547525] MCW rank 3 bound to socket 0[core 3[hwt 0]]: [./././B/./././././././././././././././././././././././././././.]
+[frnt115.frontenac.local:3547525] MCW rank 4 bound to socket 0[core 4[hwt 0]]: [././././B/././././././././././././././././././././././././././.]
+[frnt115.frontenac.local:3547525] MCW rank 5 bound to socket 0[core 5[hwt 0]]: [./././././B/./././././././././././././././././././././././././.]
+[frnt115.frontenac.local:3547525] MCW rank 6 bound to socket 0[core 6[hwt 0]]: [././././././B/././././././././././././././././././././././././.]
+[frnt115.frontenac.local:3547525] MCW rank 7 bound to socket 0[core 7[hwt 0]]: [./././././././B/./././././././././././././././././././././././.]
+[frnt115.frontenac.local:3547525] MCW rank 8 bound to socket 0[core 8[hwt 0]]: [././././././././B/././././././././././././././././././././././.]
+[frnt115.frontenac.local:3547525] MCW rank 9 bound to socket 0[core 9[hwt 0]]: [./././././././././B/./././././././././././././././././././././.]
+[frnt115.frontenac.local:3547525] MCW rank 10 bound to socket 0[core 10[hwt 0]]: [././././././././././B/././././././././././././././././././././.]
+[frnt115.frontenac.local:3547525] MCW rank 11 bound to socket 0[core 11[hwt 0]]: [./././././././././././B/./././././././././././././././././././.]
+[frnt115.frontenac.local:3547525] MCW rank 12 bound to socket 0[core 12[hwt 0]]: [././././././././././././B/././././././././././././././././././.]
+[frnt115.frontenac.local:3547525] MCW rank 13 bound to socket 0[core 13[hwt 0]]: [./././././././././././././B/./././././././././././././././././.]
+[frnt115.frontenac.local:3547525] MCW rank 14 bound to socket 0[core 14[hwt 0]]: [././././././././././././././B/././././././././././././././././.]
+# Create System:
+# Done .... 
+# miniMD-Reference 2.0 (MPI+OpenMP) output ...
+# Run Settings: 
+	# MPI processes: 16
+	# OpenMP threads: 1
+	# Inputfile: in.lj.miniMD
+	# Datafile: None
+# Physics Settings: 
+	# ForceStyle: LJ
+	# Force Parameters: 1.00 1.00
+	# Units: LJ
+	# Atoms: 8388608
+	# Atom types: 4
+	# System size: 214.99 214.99 214.99 (unit cells: 128 128 128)
+	# Density: 0.844200
+	# Force cutoff: 2.500000
+	# Timestep size: 0.005000
+# Technical Settings: 
+	# Neigh cutoff: 2.800000
+	# Half neighborlists: 1
+	# Neighbor bins: 106 106 106
+	# Neighbor frequency: 20
+	# Sorting frequency: 20
+	# Thermo frequency: 100
+	# Ghost Newton: 1
+	# Use intrinsics: 0
+	# Do safe exchange: 0
+	# Size of float: 8
+# Communication Phase Settings:
+	# Comm phase enabled: 1
+	# Comm stand-in size: 309 MB
+	# Comm chunk size: 1024 KB
+
+# Starting dynamics ...
+# Timestep T U P Time
+0 1.440000e+00 -6.773368e+00 -5.019669e+00  0.000
+
+========================================
+Reached mid-simulation checkpoint at timestep 50 (out of 100)
+Exiting parallel region for I/O...
+========================================
+
+========================================
+Performing mid-simulation checkpoint with sustained I/O
+========================================
+Cleaned 16 old checkpoint file(s) from chk/
+
+=== Starting Sustained I/O Checkpoint ===
+Chunk size: 1.00 MB
+Sleep between chunks: 100000 microseconds
+Data to write per rank: 37.94 MB
+All checkpoint data written (37.94 MB in 0.11 seconds). Continuing I/O with padding to reach 30.0 seconds...
+
+=== I/O Checkpoint Complete ===
+Actual I/O duration: 31.47 seconds
+Checkpoint data written: 37.94 MB per rank
+Total written (with padding): 323.94 MB per rank
+Number of chunks: 324
+Average bandwidth: 10.29 MB/s per rank
+=====================================
+
+
+========================================
+COMMUNICATION PHASE (Rank 0 Only)
+========================================
+Per-rank data (runtime): 37.94 MB (39779940 bytes)
+Total data (runtime): 606.99 MB (636479040 bytes) [16 ranks × per-rank]
+Stand-in total: 309.00 MB (324009984 bytes)
+Using runtime total: 606.99 MB
+Starting MPI loopback send/recv (rank 0 -> rank 0)
+Total bytes to transfer: 606.99 MB
+Chunk size: 1024.00 KB
+  ... sent 51.00 / 606.99 MB
+  ... sent 102.00 / 606.99 MB
+  ... sent 153.00 / 606.99 MB
+  ... sent 204.00 / 606.99 MB
+  ... sent 255.00 / 606.99 MB
+  ... sent 306.00 / 606.99 MB
+  ... sent 357.00 / 606.99 MB
+  ... sent 408.00 / 606.99 MB
+  ... sent 459.00 / 606.99 MB
+  ... sent 510.00 / 606.99 MB
+  ... sent 561.00 / 606.99 MB
+MPI loopback complete: 607 chunks, 606.99 MB total
+
+=== Communication Phase Complete ===
+Duration: 0.028 seconds
+Effective bandwidth: 21835.49 MB/s
+====================================
+
+
+========================================
+Resuming simulation for remaining 50 timesteps
+========================================
+100 7.604876e-01 -5.764401e+00 1.084080e-01 71.206
+
+
+# Performance Summary:
+# MPI_proc OMP_threads nsteps natoms t_total t_force t_neigh t_comm t_other performance perf/thread grep_string t_extra
+16 1 100 8388608 71.206539 30.861757 4.907400 1.235921 34.201461 11780670.879621 736291.929976 PERF_SUMMARY 0.374174
+
+

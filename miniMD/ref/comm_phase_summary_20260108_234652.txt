@@ -1,0 +1,29 @@
+======================================================================
+ADAPTIVE Communication Phase Analysis - Version 9.0
+======================================================================
+
+SYSTEM CHARACTERISTICS:
+----------------------------------------
+Total CPU cores: 32
+Warm-up samples: 1
+Monitoring duration: 0.22s
+
+STATISTICAL BASELINES:
+----------------------------------------
+power          : mean=   0.0, std=   0.0
+idle           : mean=   0.0, std=   0.0
+ctx_rate       : mean=   0.0, std=   0.0
+sync_var       : mean=   0.0, std=   0.0
+active_cpu     : mean=   0.0, std=   0.0
+net_bw         : mean=   0.0, std=   0.0
+
+PHASE ANALYSIS (Adaptive Thresholds):
+----------------------------------------
+
+Total monitored time: 0.22s
+Total tracked phase time: 0.00s
+
+======================================================================
+ADAPTIVE OPTIMIZATION RECOMMENDATIONS:
+======================================================================
+

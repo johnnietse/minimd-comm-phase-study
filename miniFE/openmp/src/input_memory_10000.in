@@ -1,0 +1,7 @@
+# Very large problem size for memory testing
+nx = 100
+ny = 100
+nz = 100
+max_iterations = 500
+tolerance = 1.0e-10
+output_frequency = 0

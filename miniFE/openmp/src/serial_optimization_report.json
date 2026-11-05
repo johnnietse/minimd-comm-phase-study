@@ -1,0 +1,17 @@
+{
+  "timestamp": "2025-11-12T02:01:33.036993",
+  "test_configuration": {
+    "application": "MiniFE",
+    "phase": "Serial Computation",
+    "threads": 1,
+    "optimization": "Power management during serial phases"
+  },
+  "results": {},
+  "phase_characteristics": {},
+  "summary": {
+    "status": "FAIL",
+    "energy_savings": 0,
+    "performance_impact": 0,
+    "recommendations": "Consider more aggressive power reduction during serial phases; Reduce power optimization aggressiveness to maintain performance; Investigate IPC degradation causes"
+  }
+}

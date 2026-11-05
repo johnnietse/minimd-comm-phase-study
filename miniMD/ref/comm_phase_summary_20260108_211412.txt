@@ -1,0 +1,26 @@
+============================================================
+MiniMD Communication Phase Analysis Summary
+============================================================
+
+PHASE DURATION ANALYSIS:
+----------------------------------------
+COMMUNICATION       :    8.93s ( 99.8%) | Samples:    1 | Avg: 8.93s
+
+Total monitored time: 8.95s
+Total tracked phase time: 8.93s
+
+COMMUNICATION ANALYSIS:
+----------------------------------------
+Time in communication: 8.93s (99.8%)
+Expected (from miniMD): ~97.7%
+NOTE: Very high communication time
+      Could indicate: MPI synchronization issues
+
+============================================================
+RECOMMENDATIONS FOR OPTIMIZATION:
+============================================================
+
+3. General MPI optimizations:
+   - Reduce message sizes (ghost cell optimization)
+   - Improve load balancing
+   - Use MPI_Iallreduce for global operations

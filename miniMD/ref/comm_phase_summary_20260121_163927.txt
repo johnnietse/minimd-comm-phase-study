@@ -1,0 +1,67 @@
+================================================================================
+INTELLIGENT MiniMD Communication Phase Analysis - Version 15.0
+================================================================================
+
+OPTIMIZATION PROFILE:
+--------------------------------------------------
+Profile: hybrid_4threads
+Description: Hybrid MPI+OpenMP with 4 threads per rank
+Recommended for: Communication-bound workloads, reduce MPI ranks
+Command: mpirun -np 8 --oversubscribe --bind-to socket --map-by socket:PE=4 ./miniMD_openmpi -i in.lj.miniMD
+Environment variables: {'OMP_NUM_THREADS': '4', 'OMP_PROC_BIND': 'true', 'OMP_PLACES': 'cores', 'OMPI_MCA_btl_tcp_if_include': 'eno1,eno2'}
+
+EMPIRICAL SCALING CONTEXT:
+--------------------------------------------------
+Expected MPI ranks: 8
+Detected MPI ranks: 8
+Expected communication: 75.5%
+Expected compute: 14.9%
+
+PHASE ANALYSIS:
+--------------------------------------------------
+
+Total monitored time: 0.00s
+Total tracked phase time: 0.00s
+Total phase changes: 0
+
+================================================================================
+OPTIMIZATION RECOMMENDATIONS:
+================================================================================
+
+Based on your configuration (8 ranks), consider these profiles:
+
+1. tuned:
+   Description: Tuned MPI parameters for Ethernet communication
+   Reason: Tuned MPI parameters optimize Ethernet communication
+   Command: mpirun -np 8 --oversubscribe --mca btl ^openib --mca btl_tcp_if_include eno1,eno2 --mca btl_tcp_rcv_buf 16777216 --mca btl_tcp_snd_buf 16777216 --mca pml ob1 --mca coll_tuned_use_dynamic_rules 1 ./miniMD_openmpi -i in.lj.miniMD
+
+2. hybrid_4threads:
+   Description: Hybrid MPI+OpenMP with 4 threads per rank
+   Reason: Hybrid approach balances communication and computation
+   Command: mpirun -np 8 --oversubscribe --bind-to socket --map-by socket:PE=4 ./miniMD_openmpi -i in.lj.miniMD
+
+================================================================================
+RANK-AWARE ANALYSIS:
+================================================================================
+
+WORKLOAD CHARACTERIZATION: BALANCED (Medium Ranks)
+  - Good balance between computation and communication
+  - Communication percentage: 40-75%
+  - Both aspects important for performance
+
+RECOMMENDED OPTIMIZATIONS:
+  - Tune MPI parameters for Ethernet communication
+  - Use moderate OpenMP threading (2-4 threads per rank)
+  - Optimize collective operations
+
+================================================================================
+NEXT STEPS FOR PERFORMANCE ANALYSIS:
+================================================================================
+
+1. Test different optimization profiles:
+   python script.py --profile tuned --ranks 16
+   python script.py --profile hybrid_4threads --ranks 8
+2. Compare results across profiles
+3. Check detailed scaling analysis: scaling_analysis_20260121_163927.json
+4. Review optimization report: optimization_report_20260121_163927.json
+5. Try different rank counts to find optimal configuration

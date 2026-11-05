@@ -1,0 +1,15 @@
+COMMUNICATION PHASE TESTING SUMMARY
+===================================
+
+Configuration: 5 baseline runs, 5 optimized runs
+
+Average Results (NA means not available)
+Metric            | Baseline     | Optimized    | Improvement (%)
+------------------|--------------|--------------|----------------
+total_time       |      10.6114 |      10.6203 |      -0.08
+comm_time        |      10.2153 |      10.3514 |      -1.33
+energy_j         |          nan |          nan |       +nan
+
+Notes:
+- total_time and comm_time parsed from miniMD Performance Summary numeric line.
+- Energy measurement not available (RAPL sysfs missing) or failed; energy_j fields may be NA.

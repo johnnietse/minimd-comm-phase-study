@@ -1,0 +1,45 @@
+{
+  "timestamp": "2026-01-21T23:06:13.545421",
+  "ranks": 8,
+  "executable": "./miniMD_openmpi",
+  "input_file": "in.lj.miniMD",
+  "profiles_tested": [
+    "baseline",
+    "tuned",
+    "hybrid_4threads",
+    "network_optimized",
+    "custom_combined"
+  ],
+  "results": {
+    "hybrid_4threads": {
+      "execution_time": 0.059983015060424805,
+      "improvement_vs_baseline": 23.005569837189373,
+      "performance": 0,
+      "success": false
+    },
+    "custom_combined": {
+      "execution_time": 0.06125688552856445,
+      "improvement_vs_baseline": 21.370424776594444,
+      "performance": 0,
+      "success": false
+    },
+    "tuned": {
+      "execution_time": 0.06342625617980957,
+      "improvement_vs_baseline": 18.585812216917617,
+      "performance": 0,
+      "success": false
+    },
+    "network_optimized": {
+      "execution_time": 0.06369614601135254,
+      "improvement_vs_baseline": 18.23938058513894,
+      "performance": 0,
+      "success": false
+    },
+    "baseline": {
+      "execution_time": 0.07790565490722656,
+      "improvement_vs_baseline": 0.0,
+      "performance": 0,
+      "success": false
+    }
+  }
+}

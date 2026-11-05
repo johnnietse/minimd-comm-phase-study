@@ -1,0 +1,27 @@
+================================================================================
+MiniMD Communication Phase Analysis - Version 12.0
+================================================================================
+
+RUN INFORMATION:
+--------------------------------------------------
+Expected MPI ranks: 32
+Detected MPI ranks: 32
+Total monitoring time: 2.89s
+
+EMPIRICAL EXPECTATIONS:
+--------------------------------------------------
+Expected communication: 96.9%
+Expected compute: 1.9%
+
+PHASE ANALYSIS:
+--------------------------------------------------
+
+
+================================================================================
+RECOMMENDATIONS:
+================================================================================
+
+WORKLOAD CHARACTERIZATION: COMMUNICATION-BOUND
+- Communication overhead dominates (>75%)
+- Problem size per rank is small
+- Focus on communication optimization (MPI tuning, network)

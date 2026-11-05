@@ -1,0 +1,248 @@
+DIFF BETWEEN zane_prototype\Testing\flags\integrate.h AND .\gia-Final\integrate.h
+diff --git "a/zane_prototype\\Testing\\flags\\integrate.h" "b/.\\gia-Final\\integrate.h"
+index 436fe48..b8a7268 100644
+--- "a/zane_prototype\\Testing\\flags\\integrate.h"
++++ "b/.\\gia-Final\\integrate.h"
+@@ -1,6 +1,3 @@
+-#ifndef INTEGRATE_H
+-#define INTEGRATE_H
+-
+ #include "atom.h"
+ #include "force.h"
+ #include "neighbor.h"
+@@ -23,16 +20,14 @@ class Integrate
+ 
+     MMD_int sort_every;
+ 
+-    // Checkpoint configuration
+-    MMD_int ckpt_interval;          // DEPRECATED - kept for compatibility
++    // Checkpoint configuration (I/O scaling only)
++    MMD_int ckpt_interval;          // Checkpoint every N timesteps (0 = disabled)
+     const char* ckpt_dir;           // Output directory for checkpoint files
+-    MMD_int ckpt_at_end;            // Perform checkpoint at end of simulation (default: 1)
+ 
+-    // Sustained I/O parameters (for monitoring I/O effects)
+-    double ckpt_io_duration_sec;    // Target I/O duration in seconds (default: 30.0)
+-    size_t ckpt_chunk_bytes;        // Bytes per chunk write (default: 1 MB)
+-    int ckpt_sleep_us;              // Sleep between chunks in microseconds (default: 100ms)
+-    int ckpt_fsync_chunks;          // Whether to fsync after each chunk (default: 0)
++    // I/O scaling parameters (for 30-second sustained I/O)
++    double ckpt_ioscale_sec;        // Duration to write (seconds) - default 30.0
++    size_t ckpt_ioscale_chunk_bytes;// Bytes per chunk write - default 1MB
++    int ckpt_ioscale_sleep_us;      // Sleep between chunks (microseconds) - default 100ms
+ 
+     Integrate();
+     ~Integrate();
+@@ -43,5 +38,3 @@ class Integrate
+ 
+     ThreadData* threads;
+ };
+-
+-#endif
+\ No newline at end of file
+DIFF BETWEEN zane_prototype\Testing\flags\integrate.h AND .\gia-scaling-io\integrate.h
+diff --git "a/zane_prototype\\Testing\\flags\\integrate.h" "b/.\\gia-scaling-io\\integrate.h"
+index 436fe48..461b175 100644
+--- "a/zane_prototype\\Testing\\flags\\integrate.h"
++++ "b/.\\gia-scaling-io\\integrate.h"
+@@ -1,6 +1,3 @@
+-#ifndef INTEGRATE_H
+-#define INTEGRATE_H
+-
+ #include "atom.h"
+ #include "force.h"
+ #include "neighbor.h"
+@@ -43,5 +40,3 @@ class Integrate
+ 
+     ThreadData* threads;
+ };
+-
+-#endif
+\ No newline at end of file
+DIFF BETWEEN zane_prototype\Testing\flags\integrate.h AND .\johnnie-comm-phase\integrate.h
+diff --git "a/zane_prototype\\Testing\\flags\\integrate.h" "b/.\\johnnie-comm-phase\\integrate.h"
+index 436fe48..453ea4d 100644
+--- "a/zane_prototype\\Testing\\flags\\integrate.h"
++++ "b/.\\johnnie-comm-phase\\integrate.h"
+@@ -1,47 +1,48 @@
+-#ifndef INTEGRATE_H
+-#define INTEGRATE_H
+-
+ #include "atom.h"
++#include "comm.h"
+ #include "force.h"
+ #include "neighbor.h"
+-#include "comm.h"
+ #include "thermo.h"
+-#include "timer.h"
+ #include "threadData.h"
++#include "timer.h"
++
+ 
+ #include <cstddef>
+ 
+-class Integrate
+-{
+-  public:
+-    MMD_float dt;
+-    MMD_float dtforce;
+-    MMD_int ntimes;
+-    MMD_int nlocal, nmax;
+-    MMD_float* x, *v, *f, *xold;
+-    MMD_float mass;
+-
+-    MMD_int sort_every;
+-
+-    // Checkpoint configuration
+-    MMD_int ckpt_interval;          // DEPRECATED - kept for compatibility
+-    const char* ckpt_dir;           // Output directory for checkpoint files
+-    MMD_int ckpt_at_end;            // Perform checkpoint at end of simulation (default: 1)
+-
+-    // Sustained I/O parameters (for monitoring I/O effects)
+-    double ckpt_io_duration_sec;    // Target I/O duration in seconds (default: 30.0)
+-    size_t ckpt_chunk_bytes;        // Bytes per chunk write (default: 1 MB)
+-    int ckpt_sleep_us;              // Sleep between chunks in microseconds (default: 100ms)
+-    int ckpt_fsync_chunks;          // Whether to fsync after each chunk (default: 0)
+-
+-    Integrate();
+-    ~Integrate();
+-    void setup();
+-    void initialIntegrate();
+-    void finalIntegrate();
+-    void run(Atom &, Force*, Neighbor &, Comm &, Thermo &, Timer &);
+-
+-    ThreadData* threads;
++class Integrate {
++public:
++  MMD_float dt;
++  MMD_float dtforce;
++  MMD_int ntimes;
++  MMD_int nlocal, nmax;
++  MMD_float *x, *v, *f, *xold;
++  MMD_float mass;
++
++  MMD_int sort_every;
++
++  // Checkpoint configuration
++  MMD_int ckpt_interval; // DEPRECATED - kept for compatibility
++  const char *ckpt_dir;  // Output directory for checkpoint files
++  MMD_int ckpt_at_end;   // Perform checkpoint at end of simulation (default: 1)
++
++  // Sustained I/O parameters (for monitoring I/O effects)
++  double ckpt_io_duration_sec; // Target I/O duration in seconds (default: 30.0)
++  size_t ckpt_chunk_bytes;     // Bytes per chunk write (default: 1 MB)
++  int ckpt_sleep_us; // Sleep between chunks in microseconds (default: 100ms)
++  int ckpt_fsync_chunks; // Whether to fsync after each chunk (default: 0)
++
++  // Communication phase parameters (Johnnie)
++  int comm_phase_enabled;    // Enable network communication phase (default: 1)
++  size_t comm_standin_bytes; // Stand-in total bytes if runtime calc not
++                             // available (default: 309 MB)
++  int comm_chunk_kb; // Chunk size for MPI_Send/Recv in KB (default: 1024 = 1MB)
++
++  Integrate();
++  ~Integrate();
++  void setup();
++  void initialIntegrate();
++  void finalIntegrate();
++  void run(Atom &, Force *, Neighbor &, Comm &, Thermo &, Timer &);
++
++  ThreadData *threads;
+ };
+-
+-#endif
+\ No newline at end of file
+DIFF BETWEEN zane_prototype\Testing\flags\integrate.h AND .\zane_mpi_comm\mpi_comm\integrate.h
+diff --git "a/zane_prototype\\Testing\\flags\\integrate.h" "b/.\\zane_mpi_comm\\mpi_comm\\integrate.h"
+index 436fe48..e2470a3 100644
+--- "a/zane_prototype\\Testing\\flags\\integrate.h"
++++ "b/.\\zane_mpi_comm\\mpi_comm\\integrate.h"
+@@ -1,47 +1,49 @@
+-#ifndef INTEGRATE_H
+-#define INTEGRATE_H
+ 
+ #include "atom.h"
++#include "comm.h"
+ #include "force.h"
+ #include "neighbor.h"
+-#include "comm.h"
+ #include "thermo.h"
+-#include "timer.h"
+ #include "threadData.h"
++#include "timer.h"
++
+ 
+ #include <cstddef>
+ 
+-class Integrate
+-{
+-  public:
+-    MMD_float dt;
+-    MMD_float dtforce;
+-    MMD_int ntimes;
+-    MMD_int nlocal, nmax;
+-    MMD_float* x, *v, *f, *xold;
+-    MMD_float mass;
+-
+-    MMD_int sort_every;
+-
+-    // Checkpoint configuration
+-    MMD_int ckpt_interval;          // DEPRECATED - kept for compatibility
+-    const char* ckpt_dir;           // Output directory for checkpoint files
+-    MMD_int ckpt_at_end;            // Perform checkpoint at end of simulation (default: 1)
+-
+-    // Sustained I/O parameters (for monitoring I/O effects)
+-    double ckpt_io_duration_sec;    // Target I/O duration in seconds (default: 30.0)
+-    size_t ckpt_chunk_bytes;        // Bytes per chunk write (default: 1 MB)
+-    int ckpt_sleep_us;              // Sleep between chunks in microseconds (default: 100ms)
+-    int ckpt_fsync_chunks;          // Whether to fsync after each chunk (default: 0)
+-
+-    Integrate();
+-    ~Integrate();
+-    void setup();
+-    void initialIntegrate();
+-    void finalIntegrate();
+-    void run(Atom &, Force*, Neighbor &, Comm &, Thermo &, Timer &);
+-
+-    ThreadData* threads;
++class Integrate {
++public:
++  MMD_float dt;
++  MMD_float dtforce;
++  MMD_int ntimes;
++  MMD_int nlocal, nmax;
++  MMD_float *x, *v, *f, *xold;
++  MMD_float mass;
++
++  MMD_int sort_every;
++
++  // Checkpoint configuration
++  MMD_int ckpt_interval; // DEPRECATED - kept for compatibility
++  const char *ckpt_dir;  // Output directory for checkpoint files
++  MMD_int ckpt_at_end;   // Perform checkpoint at end of simulation (default: 1)
++
++  // Sustained I/O parameters (for monitoring I/O effects)
++  double ckpt_io_duration_sec; // Target I/O duration in seconds (default: 30.0)
++  size_t ckpt_chunk_bytes;     // Bytes per chunk write (default: 1 MB)
++  int ckpt_sleep_us; // Sleep between chunks in microseconds (default: 100ms)
++  int ckpt_fsync_chunks; // Whether to fsync after each chunk (default: 0)
++
++  // Communication phase parameters (Johnnie)
++  int comm_phase_enabled;    // Enable network communication phase (default: 1)
++  size_t comm_standin_bytes; // Stand-in total bytes if runtime calc not
++                             // available (default: 309 MB)
++  int comm_chunk_kb; // Chunk size for MPI_Send/Recv in KB (default: 1024 = 1MB)
++
++  Integrate();
++  ~Integrate();
++  void setup();
++  void initialIntegrate();
++  void finalIntegrate();
++  void run(Atom &, Force *, Neighbor &, Comm &, Thermo &, Timer &);
++
++  ThreadData *threads;
+ };
+-
+-#endif
+\ No newline at end of file
+DIFF BETWEEN zane_prototype\Testing\flags\integrate.h AND .\zane_mpi_comm\Testing\flags\integrate.h

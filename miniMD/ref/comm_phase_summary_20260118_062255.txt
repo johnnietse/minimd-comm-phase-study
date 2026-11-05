@@ -1,0 +1,75 @@
+================================================================================
+INTELLIGENT MiniMD Communication Phase Analysis - Version 11.0
+================================================================================
+
+EMPIRICAL SCALING CONTEXT:
+--------------------------------------------------
+Expected MPI ranks: 8
+Detected MPI ranks: 8
+Expected communication: 75.5%
+Expected compute: 14.9%
+
+MINIMD GROUND TRUTH:
+--------------------------------------------------
+mpi_procs                : 8
+t_total                  : 10.000
+t_comm                   : 7.550
+t_force                  : 1.490
+comm_percentage          : 75.500
+compute_percentage       : 14.900
+
+PHASE ANALYSIS:
+--------------------------------------------------
+
+Total monitored time: 0.00s
+Total tracked phase time: 0.00s
+Total phase changes: 0
+
+================================================================================
+RANK-AWARE ANALYSIS:
+================================================================================
+
+WORKLOAD CHARACTERIZATION: BALANCED (Medium Ranks)
+  - Good balance between computation and communication
+  - Communication percentage: 40-75%
+  - Both aspects important for performance
+
+RELIABLE METRICS FOR MEDIUM RANKS:
+  ✓ Power per rank (10-20W range)
+  ✓ Per-rank CPU utilization
+  ✓ Network activity (moderate bandwidth)
+  ✓ Synchronization variance
+
+================================================================================
+RECOMMENDATIONS FOR IMPROVED MONITORING:
+================================================================================
+
+1. For low MPI ranks (≤4):
+   - Focus on per-rank metrics, not node-level metrics
+   - Use power-per-rank and CPU-per-rank for classification
+   - Ignore node idle percentage (always misleading)
+
+2. For medium MPI ranks (5-16):
+   - Combine per-rank and node-level metrics
+   - Use network activity as secondary indicator
+   - Monitor synchronization patterns
+
+3. For high MPI ranks (≥17):
+   - Node-level metrics become more reliable
+   - Network bandwidth is a strong indicator
+   - Context switches correlate with communication
+
+4. Always:
+   - Normalize metrics by rank count
+   - Use empirical scaling data for calibration
+   - Consider the percentage of idle cores in calculations
+
+================================================================================
+NEXT STEPS FOR PERFORMANCE ANALYSIS:
+================================================================================
+
+1. Validate classification with different MPI rank counts
+2. Use per-process CPU monitoring for better accuracy
+3. Implement MPI profiling integration (mpiP, IPM)
+4. Consider process affinity and core utilization
+5. Compare with scaling analysis in: scaling_analysis_20260118_062255.json

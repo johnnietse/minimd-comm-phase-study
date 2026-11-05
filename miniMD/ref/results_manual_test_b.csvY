@@ -1,0 +1,11 @@
+
+# MPI_proc OMP_threads nsteps natoms t_total t_force t_neigh t_comm t_other performance perf/thread grep_string t_extra
+16 1 100 8388608 69.522496 29.363718 4.745143 0.799921 34.613714 12066033.972490 754127.123281 PERF_SUMMARY 0.238560
+
+
+[hpc6081@frnt115 ref]$ cat results_manual_test_b.csv
+run,nprocs,energy_j,time_s,t_force,t_neigh,t_comm,t_other,performance
+1,16,12877.431,<t_total>,<t_force>,<t_neigh>,<t_comm>,<t_other>,<performance>
+[hpc6081@frnt115 ref]$ nano results_manual_test_b.csv
+  GNU nano 7.2               results_marun,nprocs,energy_j,time_s,t_force,t_neigh,t_comm,t_other,performance
+1,16,12877.431,<t_total>,<t_force>,<t_neigh>,<t_comm>,<t_other>,<performance>

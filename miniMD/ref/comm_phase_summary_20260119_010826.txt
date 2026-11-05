@@ -1,0 +1,28 @@
+================================================================================
+INTELLIGENT MiniMD Communication Phase Analysis - Version 15.0
+================================================================================
+
+EMPIRICAL SCALING CONTEXT:
+--------------------------------------------------
+Expected MPI ranks: 16
+Detected MPI ranks: 16
+Expected communication: 87.5%
+Expected compute: 4.6%
+
+MINIMD GROUND TRUTH:
+--------------------------------------------------
+mpi_procs                : 16
+t_total                  : 10.000
+t_comm                   : 8.750
+t_force                  : 0.460
+comm_percentage          : 87.500
+compute_percentage       : 4.600
+
+PHASE ANALYSIS:
+--------------------------------------------------
+
+Total monitored time: 0.00s
+Total tracked phase time: 0.00s
+Total phase changes: 0
+
+[OPTIMIZATION] See detailed recommendations in: optimization_recommendations_20260119_010826.txt

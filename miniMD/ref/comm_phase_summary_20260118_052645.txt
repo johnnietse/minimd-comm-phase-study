@@ -1,0 +1,28 @@
+================================================================================
+MiniMD Communication Phase Analysis - Version 13.0
+================================================================================
+
+RUN INFORMATION:
+--------------------------------------------------
+Command-line expected ranks: 32
+Detected MPI ranks: 4
+Total monitoring time: 17.07s
+
+EMPIRICAL EXPECTATIONS (based on detected ranks):
+--------------------------------------------------
+Expected communication: 45.3%
+Expected compute: 54.7%
+
+PHASE ANALYSIS:
+--------------------------------------------------
+IDLE                :   16.80s ( 98.40%)
+
+MINIMD GROUND TRUTH:
+--------------------------------------------------
+MPI processes: 32
+Total time: 12.733s
+Communication time: 12.491s (98.1%)
+Force time: 0.192s
+Neighbor time: 0.031s
+Compute percentage: 1.8%
+

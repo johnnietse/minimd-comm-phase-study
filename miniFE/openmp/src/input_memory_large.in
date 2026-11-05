@@ -1,0 +1,18 @@
+# Large problem input for memory-bound testing
+# This configuration stresses the memory hierarchy
+
+# Grid dimensions
+nx = 200
+ny = 200
+nz = 200
+
+# Solver parameters
+max_iterations = 1000
+tolerance = 1.0e-12
+
+# Output control
+output_frequency = 0
+
+# Memory testing flags
+enable_memory_profiling = true
+track_cache_behavior = true

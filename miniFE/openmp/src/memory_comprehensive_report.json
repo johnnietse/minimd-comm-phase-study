@@ -1,0 +1,17 @@
+{
+  "timestamp": "2025-11-12T03:17:48.478710",
+  "analysis_type": "Memory-bound Phase Comprehensive",
+  "primary_comparison": {
+    "energy_improvement": 0,
+    "performance_impact": -21.049553800968564,
+    "optimization_effective": false
+  },
+  "size_scaling": {
+    "100000": {},
+    "10000": {},
+    "1000": {},
+    "50000": {},
+    "5000": {}
+  },
+  "recommendations": "Consider more aggressive memory power management; Investigate cache performance degradation"
+}
