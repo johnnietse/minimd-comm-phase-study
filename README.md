@@ -45,3 +45,17 @@ conversion). The copy was checksum-verified against the cluster with
 the node-local scratch of an old Slurm job. That target no longer existed, so
 the link had no content; `miniMD/ref/chk.symlink.txt` records where it
 pointed.
+
+## File names containing ":"
+
+Some result files on the cluster have `:` in their names (timestamps such as
+`miniFE.32x32x32.P1.T1.2025-11-10-22:27:47.yaml`). Windows does not allow `:`
+in file names, so the copy made through WSL stores each `:` as the
+private-use character U+F03A. Contents are unchanged; only that character in
+the name differs. To restore the original names, replace U+F03A with `:`.
+
+## Upstream .gitignore
+
+The upstream folders' `.gitignore` files exclude build outputs and run
+results. In this backup all 31 such files were added anyway (`git add -f`),
+so every file from the cluster is here.

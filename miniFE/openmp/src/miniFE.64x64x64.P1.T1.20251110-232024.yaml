@@ -1,0 +1,63 @@
+Mini-Application Name: miniFE
+Mini-Application Version: 2.0
+Global Run Parameters: 
+  dimensions: 
+    nx: 64
+    ny: 64
+    nz: 64
+  load_imbalance: 0
+  mv_overlap_comm_comp: 0 (no)
+  OpenMP Max Threads:: 1
+  number of processors: 1
+  ScalarType: double
+  GlobalOrdinalType: int
+  LocalOrdinalType: int
+Platform: 
+  hostname: frnt115.frontenac.local
+  kernel name: 'Linux'
+  kernel release: '4.18.0-553.58.1.el8_10.x86_64'
+  processor: 'AMD EPYC 7551P 32-Core Processor'
+Build: 
+  CXX: '/cvmfs/soft.computecanada.ca/easybuild/software/2023/x86-64-v3/Compiler/gcc12/openmpi/4.1.5/bin/mpicxx'
+  compiler version: 'g++ (Gentoo 12.3.1_p20230526 p2) 12.3.1 20230526'
+  CXXFLAGS: '-O3 -fopenmp'
+  using MPI: yes
+Run Date/Time: 2025-11-10, 23-20-22
+Rows-per-proc Load Imbalance: 
+  Largest (from avg, %): 0
+  Std Dev (%): 0
+Matrix structure generation: 
+  Mat-struc-gen Time: 0.136277
+FE assembly: 
+  FE assembly Time: 0.539047
+Matrix attributes: 
+  Global Nrows: 274625
+  Global NNZ: 7189057
+  Global Memory (GB): 0.0823901
+  Pll Memory Overhead (MB): 0
+  Rows per proc MIN: 274625
+  Rows per proc MAX: 274625
+  Rows per proc AVG: 274625
+  NNZ per proc MIN: 7189057
+  NNZ per proc MAX: 7189057
+  NNZ per proc AVG: 7.18906e+06
+CG solve: 
+  Iterations: 200
+  Final Resid Norm: 4.15881e-15
+  WAXPY Time: 0.113848
+  WAXPY Flops: 4.73432e+08
+  WAXPY Mflops: 4158.46
+  DOT Time: 0.119529
+  DOT Flops: 2.09715e+08
+  DOT Mflops: 1754.51
+  MATVEC Time: 1.31189
+  MATVEC Flops: 2.89e+09
+  MATVEC Mflops: 2202.92
+  Total: 
+    Total CG Time: 1.5554
+    Total CG Flops: 3.57315e+09
+    Total CG Mflops: 2297.26
+  Time per iteration: 0.00777699
+Global All-RSS (kB): 122216
+Global Max-RSS (kB): 122216
+Total Program Time: 2.5195
